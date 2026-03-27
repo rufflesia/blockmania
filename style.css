@@ -1,0 +1,1609 @@
+:root {
+    --bg-color: #f0f4f8;
+    --panel-bg: #ffffff;
+    --text-color: #2c3e50;
+    --board-bg: #d1d9e6;
+    --cell-bg: #e6ebf1;
+    --cell-invalid: rgba(231, 76, 60, 0.4);
+    --shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+}
+
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    position: relative;
+    overscroll-behavior: none;
+    transition: background-color 0.5s ease;
+}
+
+.custom-icon {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    pointer-events: none;
+    z-index: 5;
+    position: relative;
+}
+
+body.death-warning-mode .header {
+    background: #2c3e50;
+    border: 2px solid #e74c3c;
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
+}
+
+body.death-warning-mode .header .score-value, body.death-warning-mode .header .score-label {
+    color: #fff;
+}
+
+body.death-mode .header {
+    background: #111;
+    border: 2px solid #c0392b;
+    box-shadow: 0 0 30px rgba(192, 57, 43, 0.8);
+}
+
+body.death-mode .score-tools {
+    filter: grayscale(100%);
+    pointer-events: none;
+    opacity: 0.3;
+}
+
+body.death-mode .header .score-value {
+    color: #fff;
+}
+
+body.death-mode .header .score-label {
+    color: #e74c3c;
+}
+
+.dw-mini-cell {
+    width: 14px;
+    height: 14px;
+    background-color: #e74c3c;
+    border-radius: 3px;
+    box-shadow: 0 0 5px #e74c3c;
+}
+
+#bg-blocks-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -2;
+    overflow: hidden;
+}
+
+.bg-piece {
+    position: absolute;
+    display: grid;
+    gap: 2px;
+    opacity: 0.15;
+    filter: blur(1px);
+    animation: fallAnimation linear forwards;
+}
+
+.bg-piece-cell {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+}
+
+@keyframes fallAnimation {
+    0% {
+        transform: translateY(-20vh) rotate(0deg);
+    }
+
+    100% {
+        transform: translateY(150vh) rotate(360deg);
+    }
+}
+
+body.shake-1 {
+    animation: shake 0.3s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+body.shake-2 {
+    animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+    transform-origin: center;
+}
+
+body.shake-3 {
+    animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+    transform-origin: center;
+}
+
+@keyframes shake {
+    10%, 90% {
+        transform: translate3d(-4px, 4px, 0);
+    }
+
+    20%, 80% {
+        transform: translate3d(6px, -6px, 0);
+    }
+
+    30%, 50%, 70% {
+        transform: translate3d(-10px, 10px, 0);
+    }
+
+    40%, 60% {
+        transform: translate3d(10px, -10px, 0);
+    }
+}
+
+button.btn-primary {
+    padding: 15px 35px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background-color: #34495e;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow);
+    z-index: 1000;
+    position: relative;
+}
+
+button.btn-primary:hover {
+    transform: translateY(-2px) scale(1.05);
+    background-color: #2c3e50;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100% !important;
+    max-width: 100%;
+    margin-bottom: 15px;
+    background: var(--panel-bg);
+    padding: 15px 20px;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    box-sizing: border-box;
+    position: relative;
+    z-index: 60;
+    transition: background 0.5s ease;
+}
+
+.header-anim-item {
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.header.game-active .header-anim-item {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.score-box {
+    position: relative;
+    text-align: left;
+    z-index: 100000;
+}
+
+.score-value {
+    font-size: clamp(2rem, 8vw, 2.5rem);
+    font-weight: 900;
+    color: #2c3e50;
+    transition: transform 0.2s, color 0.5s;
+    white-space: nowrap;
+    position: relative;
+    z-index: 10;
+}
+
+.base-score-anim-up {
+    color: #2ecc71 !important;
+    transform: scale(1.1);
+}
+
+.base-score-anim-down {
+    color: #e74c3c !important;
+    transform: scale(0.9);
+}
+
+.score-tools {
+    display: flex;
+    gap: clamp(8px, 3vw, 15px);
+    align-items: flex-end;
+    margin-top: 5px;
+}
+
+#jokers-area {
+    display: flex;
+    gap: 8px;
+}
+
+.joker-slot {
+    width: clamp(35px, 10vw, 40px);
+    height: clamp(35px, 10vw, 40px);
+    background: #ecf0f1;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
+    position: relative;
+    cursor: pointer;
+    transition: 0.2s;
+    border: 2px solid transparent;
+    padding: 5px;
+    box-sizing: border-box;
+}
+
+.joker-slot.has-item {
+    background: #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    border-color: #f1c40f;
+}
+
+.joker-slot.has-item:hover {
+    transform: scale(1.1);
+}
+
+.joker-slot.active-joker {
+    border-color: #e74c3c;
+    animation: pulseDark 0.8s infinite;
+}
+
+.joker-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #e74c3c;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+#chest-area {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chest-btn {
+    width: clamp(50px, 12vw, 60px);
+    height: clamp(50px, 12vw, 60px);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: 0.2s;
+    filter: grayscale(100%);
+    opacity: 0.5;
+    padding: 0;
+    outline: none;
+}
+
+.chest-btn.ready {
+    filter: drop-shadow(0 0 10px rgba(243, 156, 18, 0.8));
+    opacity: 1;
+    animation: chestBounce 1.5s infinite;
+}
+
+#chest-btn.drop-rate-pulse {
+    filter: drop-shadow(0 0 20px rgba(52, 152, 219, 0.8));
+    opacity: 1;
+    animation: chestBounce 1.5s infinite;
+}
+
+#chest-btn.drop-rate-pulse::after {
+    content: '↑↑';
+    position: absolute;
+    color: #3498db;
+    font-size: 1.5rem;
+    font-weight: bold;
+    opacity: 0;
+    animation: pulseArrows 1s ease-out infinite;
+}
+
+@keyframes pulseArrows {
+    0% {
+        transform: translateY(10px) scale(0.8);
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-20px) scale(1.2);
+        opacity: 0;
+    }
+}
+
+.chest-btn.mega {
+    animation: rainbowGlow 0.5s infinite, chestBounce 0.5s infinite;
+    filter: none;
+}
+
+.chest-btn.ready:hover {
+    transform: scale(1.15);
+}
+
+.chest-pop-anim {
+    animation: fastChestShake 0.2s infinite !important;
+    filter: drop-shadow(0 0 20px rgba(243, 156, 18, 1)) !important;
+    transform: scale(1.2) !important;
+}
+
+.info-btn {
+    font-size: 1rem;
+    color: #95a5a6;
+    cursor: help;
+    background: #ecf0f1;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    z-index: 100;
+    transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+}
+
+.info-btn.upgrade-notification {
+    background-color: #3498db;
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.8);
+    color: white;
+}
+
+.odds-tooltip {
+    position: absolute;
+    top: 110px;
+    right: 20px;
+    background: #34495e;
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    width: 200px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    visibility: hidden;
+    opacity: 0;
+    transition: 0.2s;
+    pointer-events: none;
+    text-align: left;
+    z-index: 100000;
+    transform: translateY(-10px);
+}
+
+.odds-tooltip.show {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.odds-tooltip p {
+    margin: 3px 0;
+    color: #ecf0f1;
+    display: flex;
+    justify-content: space-between;
+}
+
+.odds-tooltip span {
+    font-weight: bold;
+    color: #f1c40f;
+}
+
+@keyframes chestBounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes rainbowGlow {
+    0% {
+        filter: drop-shadow(0 0 15px #ff0000);
+    }
+
+    33% {
+        filter: drop-shadow(0 0 15px #00ff00);
+    }
+
+    66% {
+        filter: drop-shadow(0 0 15px #0000ff);
+    }
+
+    100% {
+        filter: drop-shadow(0 0 15px #ff0000);
+    }
+}
+
+@keyframes fastChestShake {
+    0%, 100% {
+        transform: rotate(0deg);
+    }
+
+    25% {
+        transform: rotate(-8deg);
+    }
+
+    75% {
+        transform: rotate(8deg);
+    }
+}
+
+#key-stack {
+    position: absolute;
+    bottom: -5px;
+    right: -25px;
+    display: flex;
+    flex-direction: column-reverse;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.key-icon {
+    width: 22px;
+    height: 22px;
+    margin-top: -12px;
+    opacity: 1;
+    z-index: 5;
+    filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6));
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    transition: 0.3s;
+}
+
+.combo-box {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    z-index: 50;
+}
+
+.combo-text {
+    font-size: clamp(2rem, 8vw, 2.5rem);
+    font-weight: 900;
+    color: #f39c12;
+    margin-bottom: 5px;
+    text-shadow: 0 4px 10px rgba(243, 156, 18, 0.4);
+    opacity: 0;
+}
+
+.combo-text.pop {
+    animation: comboPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.combo-text.break {
+    animation: comboBreak 0.6s ease forwards;
+    color: #c0392b !important;
+    text-shadow: 0 4px 10px rgba(192, 57, 43, 0.6) !important;
+}
+
+#life-shield-ui {
+    position: absolute;
+    font-size: 0.85rem;
+    color: #2ecc71;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+    text-shadow: 0 2px 5px rgba(46, 204, 113, 0.4);
+    transform: translateY(-30px);
+}
+
+@keyframes comboPop {
+    0% {
+        transform: scale(0);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes comboBreak {
+    0% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+
+    20% {
+        transform: scale(1.2) rotate(-10deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(0.5) translateY(50px) rotate(20deg);
+        opacity: 0;
+        filter: blur(2px);
+    }
+}
+
+@keyframes intenseShake {
+    0%, 100% {
+        transform: rotate(0) translate(0, 0);
+    }
+
+    25% {
+        transform: rotate(var(--shake-rot)) translate(var(--shake-x), var(--shake-y));
+    }
+
+    50% {
+        transform: rotate(calc(var(--shake-rot) * -1)) translate(calc(var(--shake-x) * -1), var(--shake-y));
+    }
+
+    75% {
+        transform: rotate(var(--shake-rot)) translate(var(--shake-x), calc(var(--shake-y) * -1));
+    }
+}
+
+.combo-box.shaking {
+    animation: intenseShake var(--shake-speed, 0.5s) infinite;
+}
+
+.mult-text {
+    position: absolute;
+    top: 50px;
+    right: clamp(20px, 10vw, 90px);
+    font-size: 0.75rem;
+    color: #e74c3c;
+    font-weight: 900;
+    opacity: 0;
+    animation: pulse 1s infinite;
+    white-space: nowrap;
+    z-index: 60;
+}
+
+/* FIRLAYAN SKOR SAĞ ALTA ALINDI */
+#floating-score {
+    position: absolute;
+    right: -50px;
+    bottom: 15px;
+    font-weight: 900;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+    z-index: 9999;
+}
+
+#floating-score.collecting {
+    opacity: 1;
+    transform: translate(25px, 20px) scale(1.1);
+}
+
+#floating-score.flying {
+    opacity: 0;
+    transform: translate(0px, 0px) scale(0.5);
+    transition: transform 0.3s ease-in, opacity 0.3s ease-in;
+}
+
+.fly-x-anim {
+    position: absolute;
+    font-size: 4rem;
+    color: rgba(241, 196, 15, 0.8);
+    font-weight: 900;
+    z-index: 9999;
+    pointer-events: none;
+    transition: transform 0.8s cubic-bezier(0.55, 0.085, 0.68, 0.53), opacity 0.8s;
+    text-shadow: 0 0 20px #f1c40f;
+}
+
+.levitate-anim {
+    transform: scale(1.15) translateY(-8px) !important;
+    box-shadow: inset 0 0 0 2px #f1c40f, 0 15px 25px rgba(0,0,0,0.5), 0 0 20px #f1c40f !important;
+    z-index: 100 !important;
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.6s ease !important;
+}
+
+.praise-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: clamp(2.5rem, 10vw, 5rem);
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 10000;
+    text-align: center;
+    white-space: nowrap;
+    animation: praisePop 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    -webkit-text-stroke: 1px rgba(255,255,255,0.5);
+}
+
+@keyframes praisePop {
+    0% {
+        transform: translate(-50%, -50%) scale(0.1) rotate(-15deg);
+        opacity: 0;
+    }
+
+    20% {
+        transform: translate(-50%, -50%) scale(1.2) rotate(5deg);
+        opacity: 1;
+        filter: brightness(1.5);
+    }
+
+    80% {
+        transform: translate(-50%, -50%) scale(1.1) rotate(-2deg);
+        opacity: 1;
+        filter: brightness(1);
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(2) rotate(10deg);
+        opacity: 0;
+        filter: blur(5px);
+    }
+}
+
+#agro-multiplier {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 6rem;
+    font-weight: 900;
+    color: #f39c12;
+    opacity: 0;
+    text-shadow: 0 10px 30px rgba(243, 156, 18, 0.6);
+    pointer-events: none;
+    z-index: 1000;
+}
+
+#agro-multiplier.show {
+    animation: slam 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+#death-counter-ui {
+    position: absolute;
+    top: clamp(80px, 15vh, 120px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: #e74c3c;
+    padding: 10px 25px;
+    border-radius: 30px;
+    font-size: clamp(1rem, 4vw, 1.5rem);
+    font-weight: 900;
+    border: 2px solid #e74c3c;
+    z-index: 40;
+    display: none;
+    white-space: nowrap;
+    animation: smokeAnim 2s infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes smokeAnim {
+    0% {
+        box-shadow: 0 0 15px #e74c3c, 0 15px 20px -10px rgba(255,0,0,0.6);
+    }
+
+    100% {
+        box-shadow: 0 0 35px #e74c3c, 0 -15px 20px -10px rgba(255,0,0,0.6);
+    }
+}
+
+/* OYUN TAHTASI */
+#board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    gap: 4px;
+    background-color: var(--board-bg);
+    border: 6px solid var(--board-bg);
+    border-radius: 12px;
+    width: 100%;
+    touch-action: none;
+    aspect-ratio: 1;
+    position: relative;
+    z-index: 70;
+    box-sizing: border-box;
+    transition: box-shadow 0.5s ease, border-color 0.5s ease, filter 1s ease;
+}
+
+.grid-crazy-anim {
+    animation: crazyPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes crazyPop {
+    0% {
+        transform: scale(1) translateY(0);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.15) translateY(-5px);
+        filter: brightness(1.5);
+        box-shadow: 0 10px 20px rgba(241, 196, 15, 0.8);
+        z-index: 50;
+    }
+
+    100% {
+        transform: scale(1) translateY(0);
+        filter: brightness(1);
+    }
+}
+
+.cell {
+    background-color: var(--cell-bg);
+    border-radius: 4px;
+    transition: background-color 0.25s ease, opacity 0.8s ease;
+    position: relative;
+    display: flex;
+    touch-action: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.cell.nth-region {
+    background-color: #dbe2e9;
+}
+
+.cell.hover-valid {
+    background-color: rgba(149, 165, 166, 0.6) !important;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.15);
+}
+
+.cell.hover-invalid {
+    background-color: var(--cell-invalid) !important;
+}
+
+.cell.hover-hammer {
+    background-color: rgba(231, 76, 60, 0.6) !important;
+    box-shadow: inset 0 0 15px rgba(231, 76, 60, 0.8);
+}
+
+.cell.hover-hammer-locked {
+    background-color: rgba(231, 76, 60, 0.9) !important;
+    box-shadow: inset 0 0 20px rgba(192, 57, 43, 1) !important;
+    animation: hammerBlink 0.5s infinite alternate;
+    z-index: 20;
+}
+
+@keyframes hammerBlink {
+    0% {
+        filter: brightness(1);
+    }
+
+    100% {
+        filter: brightness(0.6);
+    }
+}
+
+.cell.hover-1x1-locked {
+    background-color: rgba(241, 196, 15, 0.4) !important;
+    box-shadow: inset 0 0 20px rgba(241, 196, 15, 0.8) !important;
+    z-index: 20;
+}
+
+.cell.will-clear {
+    opacity: 0.4 !important;
+    filter: brightness(1.2) !important;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.cell.filled {
+    animation: smoothPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* TERTEMİZ YOK OLMA ANİMASYONU (IŞINSIZ, YUMUŞAK) */
+.cell.clearing {
+    animation: clearCellSmooth 0.5s ease-out forwards;
+}
+
+@keyframes clearCellSmooth {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+}
+
+.cursed-cell {
+    position: relative;
+    overflow: visible !important;
+}
+
+.cursed-cell::before, .cursed-cell::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    border-radius: 4px;
+}
+
+.cursed-cell::before {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: radial-gradient(circle, rgba(142,68,173,0.7) 30%, rgba(44,62,80,0.8) 60%, rgba(39,174,96,0.6) 90%);
+    background-size: 200% 200%;
+    background-position: 0% 0%;
+    border-radius: inherit;
+    animation: toxicFokur 3.5s ease-in-out infinite alternate;
+    z-index: 1;
+    mix-blend-mode: color-burn;
+}
+
+.cursed-cell::after {
+    top: -8px;
+    left: -8px;
+    width: calc(100% + 16px);
+    height: calc(100% + 16px);
+    background-color: rgba(142,68,173,0.3);
+    border-radius: 6px;
+    animation: cursedAura 4.2s ease-in-out infinite alternate-reverse;
+    z-index: -1;
+    filter: blur(3px);
+}
+
+@keyframes toxicFokur {
+    0% {
+        background-position: 0% 0%;
+        transform: scale(1);
+    }
+
+    50% {
+        background-position: 100% 100%;
+        transform: scale(1.02);
+    }
+
+    100% {
+        background-position: 0% 100%;
+        transform: scale(1);
+    }
+}
+
+@keyframes cursedAura {
+    0% {
+        transform: scale(1) translate(0, 0);
+        opacity: 0.2;
+    }
+
+    50% {
+        transform: scale(1.08) translate(1px, -1px);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: scale(0.95) translate(-1px, 1px);
+        opacity: 0.2;
+    }
+}
+
+.key-img-board {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 95%;
+    height: 95%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+    pointer-events: none;
+    z-index: 5;
+}
+
+.key-emoji-board {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2rem;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 10;
+    filter: none;
+    margin: 0;
+    padding: 0;
+}
+
+.special-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(5px);
+    background: rgba(44, 62, 80, 0.9);
+    color: #ecf0f1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: 0.2s ease;
+    z-index: 100005;
+    margin-bottom: 5px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.special-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: rgba(44, 62, 80, 0.9) transparent transparent transparent;
+}
+
+.cell.show-tooltip .special-tooltip, .piece-cell.show-tooltip .special-tooltip, .joker-slot.show-tooltip .special-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-5px);
+}
+
+.cell.show-tooltip, .piece-cell.show-tooltip, .joker-slot.show-tooltip {
+    z-index: 100005;
+}
+
+.crack-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(calc(-50% + 20px), calc(-50% + 18px));
+    width: 70px;
+    height: 70px;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0;
+    animation: crackAnim 1.5s ease-out forwards;
+}
+
+@keyframes crackAnim {
+    0% {
+        opacity: 1;
+        transform: translate(calc(-50% + 20px), calc(-50% + 18px)) scale(0.5);
+    }
+
+    10% {
+        transform: translate(calc(-50% + 20px), calc(-50% + 18px)) scale(1);
+    }
+
+    80% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+#pieces-container {
+    display: flex;
+    gap: clamp(15px, 6vw, 35px);
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 110px;
+    z-index: 80;
+    position: relative;
+}
+
+.piece-wrapper {
+    min-width: 85px;
+    height: 90px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    -webkit-user-select: none;
+    transform-style: preserve-3d;
+    will-change: transform;
+    user-select: none;
+    cursor: grab;
+    touch-action: none;
+    transition: transform 0.2s ease-out, opacity 0.3s, filter 0.3s;
+    animation: smoothEntry 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+#pw-0 {
+    animation-delay: 0s;
+}
+
+#pw-1 {
+    animation-delay: 0.1s;
+}
+
+#pw-2 {
+    animation-delay: 0.2s;
+}
+
+@keyframes smoothEntry {
+    0% {
+        transform: scale(0.4) translateY(40px);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 400px) {
+    .piece-wrapper > .piece {
+        transform: scale(0.85);
+    }
+
+    .header {
+        padding: 10px 15px;
+    }
+
+    .score-tools {
+        gap: 10px;
+    }
+}
+
+.piece-wrapper:hover:not(.dragging):not(.disabled) {
+    transform: scale(1.05);
+}
+
+.piece-wrapper.dragging {
+    cursor: grabbing;
+    z-index: 100;
+    transition: none;
+    filter: drop-shadow(0 25px 25px rgba(0, 0, 0, 0.4));
+    animation: none !important;
+}
+
+.piece-wrapper.disabled {
+    opacity: 0.25;
+    filter: grayscale(100%); !important;
+    pointer-events: none;
+}
+
+.piece {
+    display: grid;
+    gap: 2px;
+    pointer-events: none;
+}
+
+.piece-cell {
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+@keyframes noFitFade {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+        filter: grayscale(0%);
+    }
+
+    100% {
+        transform: scale(0.8);
+        opacity: 0;
+        filter: grayscale(100%);
+    }
+}
+
+.no-fit-anim {
+    animation: noFitFade 1.2s ease forwards;
+    pointer-events: none !important;
+}
+
+@keyframes smoothPop {
+    0% {
+        transform: scale(0.85);
+        opacity: 0.6;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* AÇIK MOD İSTATİSTİK OVERLAY'İ */
+#board-stats-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(5px); /* İşte bu kod arkada asılı kalıyordu */
+    border-radius: 12px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden; /* HAYALET BLUR İÇİN KESİN ÇÖZÜM */
+    pointer-events: none;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+    overflow: hidden;
+    padding: 15px;
+    box-sizing: border-box;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+}
+
+#board-stats-overlay.show {
+    opacity: 1;
+    visibility: visible; /* GÖRÜNÜR YAP */
+    pointer-events: auto;
+}
+
+#center-final-score {
+    font-size: 4rem;
+    font-weight: 900;
+    color: #2ecc71;
+    text-shadow: 0 5px 15px rgba(46,204,113,0.4);
+    transform: scale(0);
+    opacity: 0;
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.6s;
+}
+
+#center-final-score.pop {
+    transform: scale(1);
+    opacity: 1;
+}
+
+#center-final-label {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #7f8c8d;
+    letter-spacing: 2px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: 0.6s;
+    margin-bottom: 10px;
+}
+
+#center-final-label.pop {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#in-board-stats-content {
+    width: 100%;
+    flex: 1;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+#in-board-stats-content.show {
+    opacity: 1;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #bdc3c7;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.dot.active {
+    background: #3498db;
+    transform: scale(1.3);
+}
+
+.rs-item {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding-bottom: 5px;
+    color: #2c3e50;
+    font-weight: bold;
+}
+
+#session-stats-list li {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding-bottom: 5px;
+    font-weight: bold;
+}
+
+#session-stats-list span {
+    color: #3498db;
+}
+
+.cell-wave-shake {
+    animation: waveShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+    z-index: 85;
+    /* Dalga sırasında öne çıksın */
+    position: relative;
+}
+
+/* Parlama efekti için bir 'after' elementi ekliyoruz */
+.cell-wave-shake::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 0, 0.7);
+    /* Canlı sarı parlama */
+    border-radius: inherit;
+    animation: pulseGlow 0.5s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes waveShake {
+    0%, 100% {
+        transform: scale(1) translate(0, 0);
+    }
+
+    25% {
+        transform: scale(1.15) translate(-2px, -2px) rotate(-4deg);
+    }
+
+    50% {
+        transform: scale(1.15) translate(2px, 2px) rotate(4deg);
+        box-shadow: 0 0 25px rgba(255, 255, 0, 0.9);
+    }
+
+    /* Sarı gölge parlama */
+    75% {
+        transform: scale(1.15) translate(-2px, 2px) rotate(-4deg);
+    }
+}
+
+@keyframes pulseGlow {
+    0% {
+        opacity: 0;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.3);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(1.6);
+    }
+}
+
+/* 2. Alan bloğunun işi bitince şık bir şekilde dönerek yok olması */
+.area-block-clear {
+    animation: areaClearAnim 0.6s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+    z-index: 90;
+}
+
+@keyframes areaClearAnim {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+        filter: brightness(1.5);
+    }
+
+    50% {
+        transform: scale(1.5) rotate(180deg);
+        opacity: 0.8;
+        filter: brightness(2);
+    }
+
+    100% {
+        transform: scale(0) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Başlangıçtaki "Oyuna Başla" kutusunun dış çerçevesi */
+#start-drag-wrapper {
+    width: 80px; 
+    height: 80px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s ease-out; /* Büyüme animasyonu için */
+    z-index: 100;
+}
+
+/* İçindeki yeşil karelerin boyutu */
+#start-drag-wrapper .piece-cell {
+    width: 24px; /* Burayı 25px yaparsan JavaScript'teki hesapla tam uyar */
+    height: 24px;
+    border-radius: 3px;
+}
+
+/* Sürükleme başladığında devreye giren sınıf */
+#start-drag-wrapper.dragging {
+    cursor: grabbing;
+    filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.4));
+}
+
+/* ========================================= */
+/* YENİ ANA MENÜ ARAYÜZÜ (GRID ÜZERİ)        */
+/* ========================================= */
+
+/* Grid'i kaplayan ana menü katmanı */
+#main-menu-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(236, 240, 241, 0.85); /* Hafif beyazımsı yarı saydam arka plan */
+    backdrop-filter: blur(8px); /* Şık buzlu cam efekti */
+    border-radius: 12px;
+    z-index: 150;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+}
+
+#main-menu-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Kayıtlı Oyun Popup (Konuşma Baloncuğu) */
+.menu-popup {
+    position: absolute;
+    bottom: 120%; /* Ana butonun tam üstünde dursun */
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: #2c3e50;
+    padding: 12px 15px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 160;
+    white-space: nowrap;
+}
+
+.menu-popup.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Konuşma balonu ucu (Aşağı bakan üçgen) */
+.menu-popup::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 8px;
+    border-style: solid;
+    border-color: #2c3e50 transparent transparent transparent;
+}
+
+/* Popup içindeki mini Devam Et / Yeni Oyun butonları */
+.popup-btn {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 6px;
+    background: #2ecc71;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.popup-btn:hover { background: #27ae60; transform: scale(1.05); }
+.popup-btn-danger { background: #e74c3c; }
+.popup-btn-danger:hover { background: #c0392b; }
+
+/* ========================================= */
+/* YENİ ANA MENÜ ARAYÜZÜ (GRID ÜZERİ)        */
+/* ========================================= */
+
+#main-menu-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(236, 240, 241, 0.85); 
+    backdrop-filter: blur(8px); 
+    border-radius: 12px;
+    z-index: 150;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden; /* BLUR BUG'I İÇİN KRİTİK EKLENTİ */
+    pointer-events: none;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#main-menu-overlay.show {
+    opacity: 1;
+    visibility: visible; /* BLUR BUG'I İÇİN KRİTİK EKLENTİ */
+    pointer-events: auto;
+}
+
+/* Kayıtlı Oyun Popup (Konuşma Baloncuğu) */
+.menu-popup {
+    position: absolute;
+    bottom: 120%; 
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: #2c3e50;
+    padding: 12px 15px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 160;
+    white-space: nowrap;
+}
+
+.menu-popup.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+.menu-popup::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 8px;
+    border-style: solid;
+    border-color: #2c3e50 transparent transparent transparent;
+}
+
+.popup-btn {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 6px;
+    background: #2ecc71;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.popup-btn:hover { background: #27ae60; transform: scale(1.05); }
+.popup-btn-danger { background: #e74c3c; }
+.popup-btn-danger:hover { background: #c0392b; }
+
+/* ========================================= */
+/* BLOCKMANIA - FLAT (DÜZ) MENÜ TASARIMI     */
+/* ========================================= */
+
+/* 1. Genel Düz Buton Temeli */
+.btn-cartoon {
+    font-family: inherit;
+    font-weight: 900;
+    border: none; /* Çerçeveler kalktı */
+    border-radius: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+    text-transform: uppercase;
+}
+
+/* 2. "Oyuna Başla" Butonu */
+.btn-play-mania {
+    background-color: #2ecc71;
+    color: white;
+    padding: 15px 45px;
+    font-size: 1.6rem;
+    letter-spacing: 2px;
+    /* Katı 3D gölge yerine standart yumuşak bir gölge */
+    box-shadow: 0 8px 20px rgba(46, 204, 113, 0.4);
+}
+
+.btn-play-mania:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 12px 25px rgba(46, 204, 113, 0.6);
+}
+
+.btn-play-mania:active {
+    transform: translateY(2px);
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+}
+
+/* 3. Üst Bar Kare Butonları */
+.menu-sq-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: none; /* Çerçeve Kalktı */
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.menu-top-btn {
+    width: clamp(35px, 12vw, 45px);
+    height: clamp(35px, 12vw, 45px);
+}
+
+/* Sadece Renkler ve Yumuşak Gölgeler */
+#menu-settings-btn { background-color: #9b59b6; box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4); }
+#menu-stats-btn { background-color: #f1c40f; box-shadow: 0 4px 15px rgba(241, 196, 15, 0.4); }
+#menu-tutorial-btn { background-color: #e74c3c; box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4); }
+
+.menu-top-btn:hover {
+    transform: translateY(-3px);
+}
+
+.menu-top-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.menu-top-btn img {
+    width: 60%;
+    height: 60%;
+    object-fit: contain;
+    pointer-events: none;
+    /* İç ikon gölgesi kaldırıldı/azaltıldı */
+}
+
+/* 4. Alt Menü Geri Dön Butonu Özelleştirmesi */
+#sub-menu-back-btn {
+    border: none;
+    background-color: #e74c3c;
+    box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+    font-weight: 900;
+}
+#sub-menu-back-btn:hover { transform: translateY(-3px); }
+#sub-menu-back-btn:active { transform: translateY(2px); box-shadow: none; }
+
+/* GİZLİ KAYDIRMA (Premium UX) */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera için çubuğu gizle */
+}
+.hide-scrollbar {
+    -ms-overflow-style: none;  /* IE ve Edge için */
+    scrollbar-width: none;  /* Firefox için */
+    -webkit-overflow-scrolling: touch; /* iOS cihazlarda akıcı (momentum) kaydırma */
+}
+
+/* SAFARI İPHONE BÜYÜTEÇ VE SEÇİM İPTALİ */
+.piece-wrapper, .piece-cell, .cell, #board {
+    -webkit-touch-callout: none !important; /* iPhone basılı tutma büyütecini iptal eder */
+    -webkit-user-select: none !important;
+    user-select: none !important;
+}

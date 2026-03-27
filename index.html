@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Blockmania</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <style>
+    @media screen and (orientation: landscape) {
+        #rotate-overlay {
+            display: flex !important;
+        }
+    }
+    </style>
+</head>
+<body>
+    <div id="bg-blocks-container"></div>
+    <div id="agro-multiplier"></div>
+    <div id="death-counter-ui" data-i18n="skull_warning"></div>
+
+    <div id="app-container" style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:400px; padding:10px; box-sizing:border-box; position:relative;">
+        
+        <div class="header" id="main-header" style="min-height: 168px;">
+            
+            <div id="start-header-ui" style="display:flex; width:100%; justify-content:center; align-items:center; flex-direction:column; gap:5px; margin-bottom: 10px;">
+                <img src="blockmania.png" alt="BlockMania" style="width: 85%; height: auto; object-fit: contain;" onerror="this.outerHTML='<h1 style=\'margin:0; color:#2c3e50; font-size:2.8rem; font-weight:900; letter-spacing:1px;\'>BLOCKMANIA</h1>'">
+            </div>
+
+            <div id="normal-header-ui" style="display:none; width:100%; justify-content:space-between; align-items:center; position:relative;">
+                <div id="normal-game-elements-left" style="display:flex; flex-direction:column; align-items:flex-start; transition: opacity 0.4s ease;">
+                    
+                    <div class="score-box header-anim-item">
+                        <div id="high-score-alternator" style="font-size: 0.8rem; font-weight: bold; margin-bottom: 2px; transition: opacity 0.5s;">
+                            <span id="hs-label-top" data-i18n="high_score"></span><span id="hs-val-top" style="color:#2ecc71;">: 0</span>
+                        </div>
+                        
+                        <div style="position:relative; display:flex; flex-direction:column; align-items:flex-start;">
+                            <div id="score-bar-label" style="font-size: 0.85rem; font-weight: bold; color: #7f8c8d; display: none; margin-bottom: 2px; letter-spacing: 1px;" data-i18n="score_label"></div>
+                            <div class="score-value" id="score" style="line-height: 1;">0</div>
+                            <div id="floating-score"></div>
+                        </div>
+                        
+                        <div id="base-score-ui" style="font-size: 0.75rem; color: #3498db; font-weight: bold; margin-top: 5px;">
+                            <span data-i18n="block_multiplier"></span> <span id="base-score-val">10</span>
+                        </div>
+                    </div>
+
+                    <div class="score-tools header-anim-item" style="margin-top: 10px;">
+                        <div id="jokers-area">
+                            <div class="joker-slot" id="jk-0"></div><div class="joker-slot" id="jk-1"></div><div class="joker-slot" id="jk-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="normal-game-extras-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; transition: display 0s ease;">
+                    <div class="combo-box">
+                        <div id="life-shield-ui" style="display:none;">🛡️<span id="life-turns">0</span></div>
+                        <div class="combo-text" id="combo-display">x<span id="combo">1</span></div>
+                    </div>
+                    <div id="info-btn-el" class="info-btn" style="margin:0;">?</div>
+                    <div id="chest-area" style="position: relative; display: flex; justify-content: center; align-items: center; transform: translate(-40px, -8px);">
+                        <button id="chest-btn" class="chest-btn" onclick="openChest()">
+                            <img src="icons/chest.png" style="width:100%; height:100%; object-fit:contain; pointer-events:none;">
+                        </button>
+                        <div id="key-stack"></div>
+                    </div>
+                </div>
+
+                <div id="final-score-centered-display" style="display:none; position:absolute; top: 10px; left: 0; right: 0; flex-direction:column; align-items:center; z-index: 100;">
+                    <div style="font-size: 0.9rem; font-weight: bold; color: #7f8c8d; letter-spacing: 2px; margin-bottom: 5px; width: 100%; text-align: left; padding-left: 10px;" data-i18n="score_label"></div>
+                    <div id="final-score-centered-val" style="font-size: 3.5rem; font-weight: 900; color: #2ecc71; text-shadow: 0 4px 15px rgba(46,204,113,0.5); line-height: 1;">0</div>
+                    <div style="display:flex; align-items:center; gap:5px; margin-top: 5px; color: #3498db; font-weight:bold;">
+                        <span style="font-size: 0.9rem;" data-i18n="raw_score"></span>
+                        <span id="final-raw-score-val" style="font-size: 1.2rem;">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="death-header-ui" style="display:none; width:100%; justify-content:space-between; align-items:center;">
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <div style="color:#e74c3c; font-weight:900; font-size:1.2rem; text-shadow:0 0 10px rgba(231,76,60,0.5);" data-i18n="dw_title"></div>
+                    <div style="color:#fff; font-size:0.9rem;"><span data-i18n="dw_rounds_left"></span> <span id="dw-sets-left" style="font-size:1.5rem; font-weight:bold;">5</span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                    <div style="color:#ecf0f1; font-size:0.8rem;" data-i18n="dw_threat"></div>
+                    <div id="dw-miniature" style="display:grid; gap:2px; background:rgba(0,0,0,0.5); padding:5px; border-radius:5px; border:1px solid #e74c3c;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="odds-tooltip" id="odds-tooltip-box">
+            <div style="text-align:center; font-weight:bold; margin-bottom:5px; color:#f1c40f; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:5px;" data-i18n="chest_odds"></div>
+            <p><span data-i18n="odds_pts"></span> 250: <span id="odd-pts250">%10</span></p>
+            <p><span data-i18n="odds_pts"></span> 500: <span id="odd-pts500">%15</span></p>
+            <p><span data-i18n="odds_pts"></span> 1000: <span id="odd-pts1000">%10</span></p>
+            <p><span data-i18n="odds_pts"></span> 1500: <span id="odd-pts1500">%5</span></p>
+            <p>Combo x3: <span id="odd-m3">%25</span></p>
+            <p>Combo x5: <span id="odd-m5">%10</span></p>
+            <p><span data-i18n="odds_joker"></span> <span id="odd-joker">%24</span></p>
+            <p><span data-i18n="odds_upg"></span> <span id="odd-x1">%1</span></p>
+        </div>
+        <div id="mult-info" class="mult-text" style="opacity:0;"><span data-i18n="agro_multiplier"></span> (<span id="mult-turns"> 0</span>)</div>
+
+        <div id="board-wrapper" style="position:relative; width:100%; aspect-ratio:1; margin-bottom:15px;">
+            <div id="board"></div>
+            
+            <div id="main-menu-overlay">
+                <div id="menu-top-bar" style="position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; z-index: 10;">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="menu-sq-btn menu-top-btn" id="menu-settings-btn"><img src="icons/settings.png" alt="Settings" onerror="this.outerHTML='<span style=\'font-size:1.2rem;\'>⚙️</span>'"></button>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="menu-sq-btn menu-top-btn" id="menu-stats-btn"><img src="icons/stats.png" alt="Stats" onerror="this.outerHTML='<span style=\'font-size:1.2rem;\'>📊</span>'"></button>
+                        <button class="menu-sq-btn menu-top-btn" id="menu-tutorial-btn"><img src="icons/tutorial.png" alt="Tutorial" onerror="this.outerHTML='<span style=\'font-size:1.2rem;\'>📖</span>'"></button>
+                    </div>
+                </div>
+
+                <div id="menu-carousel" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 150px; height: 80%; width: 90%; text-align: center; margin: 0 auto;">
+                    <img id="carousel-img" src="" alt="BlockMania Showcase" style="width: 100px; height: 100px; object-fit: contain; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2)); transition: opacity 0.4s ease; margin-bottom: 55px; opacity: 0;">
+                    <div id="carousel-text" style="font-size: 1.0rem; color: #2c3e50; font-weight: 500; transition: opacity 0.4s ease; opacity: 0; min-height: 60px;"></div>
+                </div>
+
+                <div id="sub-menu-panel" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); border-radius:12px; flex-direction:column; align-items:center; justify-content:center; z-index: 160;">
+                    <h2 id="sub-menu-title" style="color:#2c3e50; margin-bottom:20px; text-align:center;" data-i18n="wip_title">Yapım Aşamasında</h2>
+                    <button class="btn-primary" id="sub-menu-back-btn" style="background-color:#e74c3c;" data-i18n="go_back_btn">Geri Dön</button>
+                </div>
+            </div>
+
+<div id="board-stats-overlay">
+                <button id="close-stats-btn" onclick="window.closeStats()" style="display:none; position:absolute; top:10px; right:15px; background:none; border:none; font-size:1.5rem; color:#e74c3c; font-weight:bold; cursor:pointer; z-index:200;">X</button>
+                
+                <div id="in-board-stats-content">
+                    <div id="slider-track" style="display:flex; width:200%; height:100%; transition:transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);">
+                        <div style="width:50%; padding:10px; display:flex; flex-direction:column; justify-content:center;">
+                            <div style="font-size:0.9rem; color:#7f8c8d; font-weight:bold;" data-i18n="high_score">En Yüksek Skor</div>
+                            <div style="font-size:1.8rem; font-weight:900; color:#2ecc71;" id="stat-hs"> 0</div>
+                            <div style="font-size:0.9rem; color:#3498db; margin-bottom:10px; font-weight:bold;"><span data-i18n="raw_score">Ham Skor</span>: <span id="stat-h-raw">0</span></div>
+                            <div style="font-size:0.9rem; color:#e74c3c; font-weight:bold; margin-bottom:5px;" data-i18n="recent_scores_title">Son Skorlar</div>
+                            <div id="recent-scores-list" style="flex:1; background:rgba(0,0,0,0.05); border-radius:8px; padding:10px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; font-size:0.85rem;" class="hide-scrollbar"></div>
+                        </div>
+                        <div style="width:50%; padding:10px; display:flex; flex-direction:column; justify-content:center;">
+                            <div style="font-size:1rem; color:#f39c12; font-weight:bold; margin-bottom:10px;" data-i18n="analysis_title">Oynanış Analizi</div>
+                            <ul id="session-stats-list" style="flex:1; background:rgba(0,0,0,0.05); border-radius:8px; padding:10px; margin:0; list-style:none; overflow-y:auto; display:flex; flex-direction:column; gap:8px; font-size:0.8rem; color:#2c3e50; text-align:left;" class="hide-scrollbar"></ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:10px; margin-top:10px;" id="stats-dots">
+                    <div class="dot active" onclick="setSlide(0)"></div>
+                    <div class="dot" onclick="setSlide(1)"></div>
+                </div>
+            </div>
+
+            <style>
+                /* Switch Animasyonu İçin Gerekli Mini CSS */
+                .switch input:checked + .slider { background-color: #2ecc71 !important; }
+                .switch input:checked + .slider .knob { transform: translateX(18px); }
+            </style>
+            <div id="settings-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.97); z-index: 300; border-radius: 12px; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y:auto;" class="hide-scrollbar">
+                <button onclick="window.closeSettings()" style="position:absolute; top:10px; right:15px; background:none; border:none; font-size:1.5rem; color:#e74c3c; font-weight:bold; cursor:pointer;">X</button>
+                <h2 data-i18n="settings_title" style="color:#2c3e50; margin-top:0; margin-bottom: 25px; text-align:center;">Ayarlar</h2>
+
+                <div style="margin-bottom: 25px;">
+                    <div style="font-weight:bold; color:#34495e; margin-bottom:5px; font-size: 0.9rem;"><span data-i18n="volume_label"></span>: <span id="vol-val-text" style="color:#3498db;">100%</span></div>
+                    <input type="range" id="volume-slider" min="0" max="100" value="100" oninput="window.updateVolume(this.value)" style="width:100%; accent-color:#3498db; cursor:pointer;">
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 25px; gap:10px;">
+                    
+                    <button onclick="window.toggleLanguage()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 10px; border-radius:12px; border:2px solid #3498db; background:#ebf5fb; color:#2980b9; font-weight:bold; cursor:pointer; transition: transform 0.1s;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04M18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12m-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+                        <span id="lang-btn-text" data-i18n="lang_name">Türkçe</span>
+                    </button>
+
+                    <div style="flex:1; display:flex; align-items:center; justify-content:space-between; padding:12px 10px; background:#f8f9fa; border-radius:12px; border:1px solid #ddd; position:relative;">
+                        <div style="display:flex; align-items:center; gap:5px; font-weight:bold; color:#2c3e50; font-size:0.8rem;">
+                            <span></span> <span data-i18n="motion_label"></span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <label class="switch" style="position:relative; display:inline-block; width:40px; height:22px;">
+                                <input type="checkbox" id="motion-toggle" onchange="window.toggleMotion(this.checked)" checked style="opacity:0; width:0; height:0;">
+                                <span class="slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.3s; border-radius:22px;">
+                                    <span class="knob" style="position:absolute; content:''; height:16px; width:16px; left:3px; bottom:3px; background-color:white; transition:.3s; border-radius:50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+                                </span>
+                            </label>
+                            <button id="motion-info-btn" style="background:#f39c12; color:white; border:none; border-radius:50%; width:18px; height:18px; font-size:11px; font-weight:bold; cursor:pointer; line-height:1;">i</button>
+                        </div>
+                        <div id="motion-tooltip" style="display:none; position:absolute; top:-70px; right:0; background:#2c3e50; color:white; padding:10px; border-radius:8px; font-size:0.75rem; width:190px; text-align:center; box-shadow:0 6px 15px rgba(0,0,0,0.3); z-index:310; pointer-events:none;">
+                            <span data-i18n="motion_tooltip"></span>
+                            <div style="position:absolute; bottom:-4px; right:15px; width:10px; height:10px; background:#2c3e50; transform:rotate(45deg);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <div style="font-weight:bold; color:#34495e; margin-bottom:8px; font-size: 0.9rem;" data-i18n="theme_label"></div>
+                    <div id="theme-swatches" style="display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; padding-top: 5px;" class="hide-scrollbar">
+                        </div>
+                </div>
+
+                <div style="flex:1;"></div>
+
+                <button onclick="window.resetAllData()" style="background:#e74c3c; color:white; font-weight:bold; font-size:1rem; padding:15px; border:none; border-radius:12px; width:100%; box-shadow: 0 4px 15px rgba(231,76,60,0.4); cursor:pointer; margin-top:10px;" data-i18n="reset_data"></button>
+            </div>
+            
+        </div>
+
+        <div id="bottom-fixed-area" style="width:100%; height:120px; position:relative; display:flex; justify-content:center; align-items:center;">
+            
+            <div id="interactive-start-area" style="display:none; flex-direction:row; align-items:center; justify-content:center; width:100%; position:absolute;">
+                <div style="display:flex; flex-direction:column; align-items:center;">
+                    <div id="start-drag-wrapper" class="piece-wrapper" style="width:25px; height:60px; cursor:grab; z-index:100;">
+                        <div class="piece" style="grid-template-columns: repeat(3, 25px);">
+                            <div class="piece-cell"></div><div class="piece-cell" style="background:#2ecc71;"></div><div class="piece-cell"></div>
+                            <div class="piece-cell" style="background:#2ecc71;"></div><div class="piece-cell" style="background:#2ecc71;"></div><div class="piece-cell" style="background:#2ecc71;"></div>
+                            <div class="piece-cell"></div><div class="piece-cell" style="background:#2ecc71;"></div><div class="piece-cell"></div>
+                        </div>
+                    </div>
+                    <div style="font-weight:bold; color:#7f8c8d; margin-top:5px; pointer-events:none; font-size:0.9rem;"></div>
+                </div>
+            </div>
+
+            <div id="pieces-container" style="display:none; position:absolute; width: 100%; justify-content: center; align-items: center; z-index: 200;">
+                <div class="piece-wrapper" id="pw-0"></div>
+                <div class="piece-wrapper" id="pw-1"></div>
+                <div class="piece-wrapper" id="pw-2"></div>
+
+                <div id="menu-action-area" style="display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; z-index: 250;">
+                    
+                    <div id="save-popup" class="menu-popup" style="bottom: 110%; margin-bottom: 5px; z-index: 260;">
+                        <div style="font-size: 0.8rem; font-weight: bold; margin-bottom: 8px; color: #f1c40f;" data-i18n="save_found">Kayıtlı Oyun Bulundu!</div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="popup-btn" id="resume-btn" data-i18n="resume_btn">Devam Et</button>
+                            <button class="popup-btn popup-btn-danger" id="new-game-btn" data-i18n="new_game_btn">Yeni Oyun</button>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-cartoon btn-play-mania" id="play-main-btn" style="position: relative; z-index: 250;" data-i18n="play_btn">Oyuna Başla</button>
+                    
+                </div>
+            </div>
+
+            <div id="gameover-btn-group" style="display:none; flex-direction:row; gap:15px; width:100%; justify-content:center; position:absolute; z-index: 100;">
+                <button class="btn-primary" id="play-again-btn" onclick="playAgainDirectly()" style="flex:1; font-size:1.1rem; background-color:#2ecc71;" data-i18n="play_again_btn">Tekrar Oyna</button>
+                <button class="btn-primary" onclick="window.returnToMainMenu()" style="flex:1; font-size:1.1rem; background-color:#34495e;" data-i18n="main_menu_btn">Ana Menü</button>
+            </div>
+            
+        </div>
+
+    <script src="shapes.js"></script>
+    <script src="blocks.js"></script>
+    <script src="opening.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
