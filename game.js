@@ -928,7 +928,10 @@ function spawnBgBlock() {
     pieceEl.style.gridTemplateColumns = `repeat(${shape[0].length}, 30px)`;
     pieceEl.style.left = `${Math.random() * 90}vw`;
     let activeCombo = (userSettings.motionEnabled === false) ? 0 : Math.min(combo, 6);
-    const fallDuration = 18 - (activeCombo / 6 * 16);
+    const isLowPower = window.innerWidth < 390; // iPhone mini-class screens
+    const maxComboEffect = isLowPower ? 3 : 6;  // cap speed boost at x3 on small phones
+    const cappedCombo = Math.min(activeCombo, maxComboEffect);
+    const fallDuration = 18 - (cappedCombo / maxComboEffect * 10);
     pieceEl.style.animationDuration = `${fallDuration}s`;
     for (let r = 0; r < shape.length; r++)
         for (let c = 0; c < shape[0].length; c++) {
@@ -944,7 +947,7 @@ function spawnBgBlock() {
             pieceEl.remove();
     }
     , fallDuration * 1000);
-    const nextSpawn = 4900 - (activeCombo / 5 * 4800);
+    const nextSpawn = 2900 - (activeCombo / 5 * 2800);
     const isMobile = window.innerWidth <= 768;
     const densityFactor = isMobile ? 4.5 : 1; // Mobilde bekleme süresini 2.5 kat uzat (daha az blok)
     
@@ -1225,7 +1228,8 @@ function generatePieces(isShuffle=false) {
             deathWave.counter--;
             updateDeathWaveUI();
             if (deathWave.counter === 0) {
-                document.getElementById('dw-sets-left').innerHTML = `<span style="font-size: 1.5rem; font-weight: bold; color: #e74c3c;">${t('death_warning')}</span>`;
+                document.getElementById('dw-rounds-label').style.display = 'none';
+		document.getElementById('dw-sets-left').innerHTML = `<span style="font-size: 1.5rem; font-weight: bold; color: #e74c3c;">${t('death_warning')}</span>`;
             }
         }
         if (!deathWave.active && score >= 20000 && score >= deathWave.nextEligibleScore) {
@@ -1346,12 +1350,15 @@ function updateTrayPiecesState() {
                         break;
                     }
                 }
-            if (fits)
+	if (fits) {
+                wrapper.style.animation = '';
                 wrapper.classList.remove('disabled');
-            else
+            } else {
+                wrapper.style.animation = 'none';
                 wrapper.classList.add('disabled');
+            }
         }
-    }, 800); // 300 Milisaniye Animasyon Bekleme Süresi
+    }, 500); // 300 Milisaniye Animasyon Bekleme Süresi
 }
 
 function saveHistory() {
@@ -2048,7 +2055,8 @@ function checkGameOver() {
             executeDeathPenalty();
             return;
         }
-        let playableLifeline = playerKeys > 0 || playerJokers.some(j => j.type !== 'undo' || historyState !== null);
+	let inDeathTurn = deathWave.inDeathTurn;
+        let playableLifeline = !inDeathTurn && (playerKeys > 0 || playerJokers.some(j => j.type !== 'undo' || historyState !== null));
         if (!playableLifeline)
             triggerGameOverSequence();
     }
@@ -2264,11 +2272,9 @@ function tallyPoints(pts) {
 }
 
 function updateChestUI() {
-    if (playerKeys > 5)
-        playerKeys = 5;
     const stack = document.getElementById('key-stack');
     stack.innerHTML = '';
-    for (let i = 0; i < playerKeys; i++) {
+    for (let i = 0; i < Math.min(playerKeys, 5); i++) {
         let k = document.createElement('div');
         k.className = 'key-icon';
         k.innerHTML = STACK_KEY_HTML;
@@ -2306,11 +2312,10 @@ function openChest() {
 function openMegaChest() {
     if (isGameOverSequence || document.body.classList.contains('death-mode') || activeAnimations > 0)
         return;
-    playerKeys = 0;
-    stats.megaChestsOpened++;
-    updateChestUI();
-
-    let guaranteedJoker = {
+	playerKeys = Math.max(0, playerKeys - 5);
+    	stats.megaChestsOpened++;
+    	updateChestUI();
+    	let guaranteedJoker = {
         type: 'joker',
         val: ['hammer', 'shuffle', 'undo', '1x1'][Math.floor(Math.random() * 4)]
     };
