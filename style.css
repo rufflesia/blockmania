@@ -511,7 +511,7 @@ button.btn-primary:hover {
     font-weight: bold;
     animation: pulse 2s infinite;
     text-shadow: 0 2px 5px rgba(46, 204, 113, 0.4);
-    transform: translateY(-30px);
+    transform: translateY(-12px);
 }
 
 @keyframes comboPop {
@@ -822,7 +822,7 @@ button.btn-primary:hover {
     }
 
     100% {
-        transform: scale(0.3);
+        transform: scale(0.1);
         opacity: 0;
     }
 }
