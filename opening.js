@@ -139,8 +139,66 @@ document.addEventListener("DOMContentLoaded", () => {
         if (typeof window.openSettings === "function") window.openSettings();
     });
     tutorialBtn.addEventListener('click', () => {
-        let msg = (typeof t === 'function') ? t('tutorial_wip') : 'Nasıl oynanır menüsü yapım aşamasında!';
-        alert(msg);
+        const existing = document.getElementById('tut-confirm-popup');
+        if (existing) { existing.remove(); return; }
+
+        const popup = document.createElement('div');
+        popup.id = 'tut-confirm-popup';
+        popup.style.cssText = `
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            background:rgba(0,0,0,.55);z-index:9000;
+            display:flex;align-items:center;justify-content:center;
+        `;
+
+        const box = document.createElement('div');
+        box.style.cssText = `
+            background:white;border-radius:20px;padding:28px 24px;
+            text-align:center;width:85%;max-width:300px;
+            box-shadow:0 20px 50px rgba(0,0,0,.35);
+        `;
+
+        const title = document.createElement('div');
+        title.style.cssText = 'font-size:1.2rem;font-weight:900;color:#2c3e50;margin-bottom:10px;';
+        title.innerText = (typeof t === 'function') ? t('tut_confirm_title') : 'Start Tutorial?';
+
+        const body = document.createElement('div');
+        body.style.cssText = 'font-size:.9rem;color:#7f8c8d;margin-bottom:22px;line-height:1.5;';
+        body.innerText = (typeof t === 'function') ? t('tut_confirm_body') : 'Learn the basics step by step?';
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+
+        const yesBtn = document.createElement('button');
+        yesBtn.style.cssText = `
+            background:#2ecc71;color:white;border:none;border-radius:12px;
+            padding:13px;font-size:1rem;font-weight:900;cursor:pointer;
+            box-shadow:0 4px 15px rgba(46,204,113,.4);
+        `;
+        yesBtn.innerText = (typeof t === 'function') ? t('tut_confirm_yes') : 'Yes, Show Me!';
+        yesBtn.onclick = () => {
+            popup.remove();
+            mainMenuOverlay.classList.remove('show');
+            clearTimeout(carouselTimer);
+            if (typeof window.startTutorial === 'function') window.startTutorial();
+        };
+
+        const noBtn = document.createElement('button');
+        noBtn.style.cssText = `
+            background:none;color:#95a5a6;border:none;
+            font-size:.85rem;cursor:pointer;padding:6px;
+        `;
+        noBtn.innerText = (typeof t === 'function') ? t('tut_confirm_no') : "No, I'll Figure It Out";
+        noBtn.onclick = () => popup.remove();
+
+        btnRow.appendChild(yesBtn);
+        btnRow.appendChild(noBtn);
+        box.appendChild(title);
+        box.appendChild(body);
+        box.appendChild(btnRow);
+        popup.appendChild(box);
+
+        popup.addEventListener('click', (e) => { if (e.target === popup) popup.remove(); });
+        document.body.appendChild(popup);
     });
 
     // Popup Dışına Tıklayınca Kapatma
@@ -154,7 +212,6 @@ document.addEventListener("DOMContentLoaded", () => {
     function startGameDirectly() {
         mainMenuOverlay.classList.remove('show');
         clearTimeout(carouselTimer); // Carousel'i kesinlikle durdur (oyun içinde arkada RAM yemesin)
-        if (typeof window.closeSettings === 'function') window.closeSettings()
         if(typeof isGameRunning !== 'undefined') isGameRunning = true;
         if(typeof setGameState === 'function') setGameState('PLAYING');
         if (typeof startGame === "function") startGame();
