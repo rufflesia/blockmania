@@ -72,7 +72,43 @@
         
         "loot_pts": "Puan",
         "loot_mult": "x5 Çarpan",
-        "loot_turns": "Tur"
+        "loot_turns": "Tur",
+
+        "tut_confirm_title": "Eğitim Modunu Başlat?",
+        "tut_confirm_body": "Temel mekanikleri adım adım öğrenmek ister misin?",
+        "tut_confirm_yes": "Evet, Göster!",
+        "tut_confirm_no": "Hayır, Oynayacağım",
+
+        "tut_s1_desc": "Bu 1×3 bloğu sürükle ve satırı tamamla! Satır dolunca patlayacak.",
+        "tut_s2_desc": "Bu bloğu sürükle ve sütunu tamamla! Dikey sütunlar da patlayabilir.",
+        "tut_s3_desc": "Bu bloğu sürükle ve 3×3 kutuyu tamamla! Her 3×3 bölge de bir patlama alanıdır.",
+        "tut_s4_desc": "Bu bir Sandık! 5 anahtar toplarsan içindeki ödülü kazanırsın.",
+        "tut_s5_desc": "🔑 Anahtarlı bu bloğu sürükle ve satırı tamamla! Anahtar sandığa uçacak.",
+        "tut_s5_open": "5 anahtar toplandı! Sandığa tıkla ve aç!",
+        "tut_s5_hammer": "Çekiç Jokeri kazandın! Sürükleyip 2×2 alanı kırmak için kullan.",
+        "tut_s6_desc": "Çekiç Jokerini tahtaya sürükle, bir yer seç.",
+        "tut_click_break": "Kır! Seçili alana tıkla.",
+        "tut_s7_desc": "Bu blok satırın tamamını tek hamlede yok eder! Sürükle ve yerleştir.",
+        "tut_s8_desc": "Arka arkaya satır kırarsan kombo çarpanın yükselir! İlk bloğu yerleştir.",
+        "tut_s8_more": "Harika! Devam et, komboyu yükselt!",
+        "tut_specials_title": "⚡ ÖZEL BLOKLAR",
+        "tut_cursed_title": "☠️ LANETLİ BLOKLAR",
+        "tut_finish_title": "Hazırsın!",
+        "tut_finish_sub": "Tüm temel mekaniği öğrendin. İyi oyunlar!",
+
+        "desc_multX": "Çarpan Bloğu: Mevcut skoru kombo değeriyle çarpar.",
+        "tut_desc_minus": "Eksi Bloğu: Skoru belirli bir yüzde oranında azaltır. Ne kadar beklenirse ceza o kadar artar.",
+        "tut_desc_cursedkey": "Lanetli Anahtar: Bir sonraki anahtar düşme ihtimalini geçici olarak azaltır.",
+        "tut_desc_scoredown": "Skor Düşürücü: Blok başına kazandığın puanı 1 azaltır.",
+	
+	"desc_minus": "Eksi Bloğu: Her geçen turla cezası artan skor azaltıcı. Bir an önce kır!",
+	"desc_scoreUp": "Skor Artırıcı: Blok başına kazandığın puanı kalıcı olarak artırır.",
+	"desc_scoreDown": "Skor Azaltıcı: Blok başına kazandığın puanı 1 düşürür.",
+	"desc_multX": "Çarpan Bloğu: Mevcut skoru aktif kombo değeriyle çarpar.",
+	"desc_cursedKey": "Lanetli Anahtar: Bir sonraki anahtar düşme şansını geçici olarak azaltır.",
+	"desc_upg": "Yükseltme: Sandık ödül tablosunu iyileştirerek daha değerli ödüller çıkarır.",
+	"desc_M": "Mega Bomba: Tüm komşu hücreleri zincirleme olarak yok eder.",
+	"desc_X": "X Bombası: Çapraz yönlerde tüm hücreleri imha eder."
     },
     "en": {
         "blockmania_title": "BLOCKMANIA",
@@ -147,6 +183,42 @@
         
         "loot_pts": "Points",
         "loot_mult": "x5 Multiplier",
-        "loot_turns": "Turns"
+        "loot_turns": "Turns",
+
+        "tut_confirm_title": "Start Tutorial?",
+        "tut_confirm_body": "Would you like to learn the basics step by step?",
+        "tut_confirm_yes": "Yes, Show Me!",
+        "tut_confirm_no": "No, I'll Figure It Out",
+
+        "tut_s1_desc": "Drag this 1×3 block and complete the row! A full row will explode.",
+        "tut_s2_desc": "Drag this block and complete the column! Vertical columns explode too.",
+        "tut_s3_desc": "Drag this block and complete the 3×3 box! Every 3×3 region is also a clear zone.",
+        "tut_s4_desc": "This is a Chest! Collect 5 keys and it opens with a reward inside.",
+        "tut_s5_desc": "🔑 Drag this key block and complete the row! The key will fly to the chest.",
+        "tut_s5_open": "5 keys collected! Tap the chest to open it!",
+        "tut_s5_hammer": "You got a Hammer Joker! Drag it onto the board to smash a 2×2 area.",
+        "tut_s6_desc": "Drag the Hammer Joker onto the board and pick a spot.",
+        "tut_click_break": "Break it! Tap the highlighted area.",
+        "tut_s7_desc": "This block destroys an entire row in one move! Drag it and place it.",
+        "tut_s8_desc": "Clearing rows back-to-back raises your combo multiplier! Place the first block.",
+        "tut_s8_more": "Great! Keep going, build the combo!",
+        "tut_specials_title": "⚡ SPECIAL BLOCKS",
+        "tut_cursed_title": "☠️ CURSED BLOCKS",
+        "tut_finish_title": "You're Ready!",
+        "tut_finish_sub": "You've learned all the core mechanics. Have fun!",
+
+        "desc_multX": "Multiplier Block: Multiplies your current score by the combo value.",
+        "tut_desc_minus": "Minus Block: Reduces your score by a percentage. The longer it sits, the bigger the penalty.",
+        "tut_desc_cursedkey": "Cursed Key: Temporarily lowers the chance of key blocks appearing.",
+        "tut_desc_scoredown": "Score Down: Reduces your per-block score by 1.",
+
+	"desc_minus": "Minus Block: Penalty grows every turn. Destroy it fast!",
+	"desc_scoreUp": "Score Up: Permanently increases your per-block score.",
+	"desc_scoreDown": "Score Down: Reduces your per-block score by 1.",
+	"desc_multX": "Multiplier Block: Multiplies your current score by your active combo.",
+	"desc_cursedKey": "Cursed Key: Temporarily lowers the chance of key blocks appearing.",
+	"desc_upg": "Upgrade: Improves the chest loot table for more valuable rewards.",
+	"desc_M": "Mega Bomb: Chain-destroys all adjacent cells.",
+	"desc_X": "X Bomb: Obliterates all cells diagonally."
     }
 }
