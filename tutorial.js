@@ -441,6 +441,18 @@
         tPopupEl = null;
     }
 
+function showTryAgain(msg, cb) {
+        const toast = mk('div');
+        css(toast, `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                    background:#e74c3c;color:white;padding:14px 22px;border-radius:14px;
+                    font-size:1rem;font-weight:900;z-index:10040;text-align:center;
+                    box-shadow:0 8px 25px rgba(0,0,0,.4);pointer-events:none;
+                    animation:tutBounceIn .3s ease both;`);
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.remove(); if (cb) cb(); }, 1400);
+    }
+
     // ============================================================
     // TRAY & PIECE DRAG
     // ============================================================
@@ -503,6 +515,7 @@
     function startDrag(e, wrapEl, pd) {
         tDrag = {wrapEl, pd};
         wrapEl.style.opacity = '.3';
+	clearSpotlight();
 
         tGhostEl = mk('div');
         css(tGhostEl,`position:fixed;pointer-events:none;z-index:10030;display:grid;gap:2px;
@@ -873,7 +886,12 @@ function onPUp(e) {
                 clearSpotlight();
                 if (tBoard[7].every(v=>v!==0)) {
                     setTimeout(()=>clearRowAnim(7,()=>{ addScore(90); tAnimLock=false; setTimeout(()=>goStep(1),600); }),200);
-                } else { tAnimLock=false; }
+                } else {
+                    tAnimLock=false;
+                    showTryAgain(tt('tut_wrong'), () => {
+                        goStep(0);
+                    });
+                }
             };
         },500);
     }
@@ -898,7 +916,12 @@ function onPUp(e) {
                 clearSpotlight();
                 if ([0,1,2,3,4,5,6,7,8].every(r=>tBoard[r][8]!==0)) {
                     setTimeout(()=>clearColAnim(8,()=>{ addScore(90); tAnimLock=false; setTimeout(()=>goStep(2),600); }),200);
-                } else { tAnimLock=false; }
+                } else {
+                    tAnimLock=false;
+                    showTryAgain(tt('tut_wrong'), () => {
+                        goStep(1);
+                    });
+                }
             };
         },500);
     }
@@ -926,7 +949,12 @@ function onPUp(e) {
                 const ok=[0,1,2].every(i=>[0,1,2].every(j=>tBoard[6+i][6+j]!==0));
                 if (ok) {
                     setTimeout(()=>clearBoxAnim(6,6,()=>{ addScore(90); tAnimLock=false; setTimeout(()=>goStep(3),600); }),200);
-                } else { tAnimLock=false; }
+                } else {
+                    tAnimLock=false;
+                    showTryAgain(tt('tut_wrong'), () => {
+                        goStep(2);
+                    });
+                }
             };
         },500);
     }
@@ -1134,8 +1162,14 @@ function onPUp(e) {
                     });
                 },200);
             } else {
-                tAnimLock=false;
-                serveNextPiece();
+                showTryAgain(tt('tut_wrong'), () => {
+                    tAnimLock=false;
+                    serveNextPiece();
+                    setTimeout(()=>{
+                        const pw=tTrayEl.querySelector('div');
+                        if(pw) spotlight(pw, tt('tut_s8_desc'), 'top');
+                    }, 300);
+                });
             }
         }
 
