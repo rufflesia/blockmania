@@ -270,7 +270,8 @@ function loadAndResumeGame() {
         stats = parsed.stats;
         gameThemeColor = parsed.gameThemeColor;
 
-        endDeathWave();
+        // Reset CSS state without touching deathWave data
+        document.body.classList.remove('death-mode', 'death-warning-mode');
         document.getElementById('base-score-val').innerText = gameState.baseBlockScore;
         document.getElementById('score').innerText = formatScore(score);
         if (deathWave.active) {
@@ -281,6 +282,9 @@ function loadAndResumeGame() {
                 document.body.classList.add('death-mode');
             else
                 document.body.classList.add('death-warning-mode');
+        } else {
+            document.getElementById('death-header-ui').style.display = 'none';
+            document.getElementById('normal-header-ui').style.display = 'flex';
         }
         updateOddsUI();
         updateComboUI();
@@ -947,7 +951,7 @@ function spawnBgBlock() {
             pieceEl.remove();
     }
     , fallDuration * 1000);
-    const nextSpawn = 2900 - (activeCombo / 5 * 2800);
+    const nextSpawn = 2900 - (activeCombo / 5 * 2600);
     const isMobile = window.innerWidth <= 768;
     const densityFactor = isMobile ? 4.5 : 1; // Mobilde bekleme süresini 2.5 kat uzat (daha az blok)
     
@@ -2056,7 +2060,8 @@ function checkGameOver() {
             return;
         }
 	let inDeathTurn = deathWave.inDeathTurn;
-        let playableLifeline = !inDeathTurn && (playerKeys > 0 || playerJokers.some(j => j.type !== 'undo' || historyState !== null));
+        let inDeathMode = deathWave.active || deathWave.inDeathTurn;
+        let playableLifeline = !inDeathMode && (playerKeys > 0 || playerJokers.some(j => j.type !== 'undo' || historyState !== null));
         if (!playableLifeline)
             triggerGameOverSequence();
     }
@@ -2274,16 +2279,20 @@ function tallyPoints(pts) {
 function updateChestUI() {
     const stack = document.getElementById('key-stack');
     stack.innerHTML = '';
-    for (let i = 0; i < Math.min(playerKeys, 5); i++) {
+    const displayKeys = Math.min(playerKeys, 5);
+    for (let i = 0; i < displayKeys; i++) {
         let k = document.createElement('div');
         k.className = 'key-icon';
         k.innerHTML = STACK_KEY_HTML;
         stack.appendChild(k);
     }
     const btn = document.getElementById('chest-btn');
-    if (playerKeys === 5) {
+    if (playerKeys >= 5) {
         btn.classList.add('ready', 'mega');
-        setTimeout(openMegaChest, 1000);
+        if (!updateChestUI._megaPending) {
+            updateChestUI._megaPending = true;
+            setTimeout(() => { updateChestUI._megaPending = false; openMegaChest(); }, 1000);
+        }
     } else if (playerKeys > 0) {
         btn.classList.add('ready');
         btn.classList.remove('mega');
@@ -2291,6 +2300,7 @@ function updateChestUI() {
         btn.classList.remove('ready', 'mega');
     }
 }
+
 function updateMultUI() {
     const m = document.getElementById('mult-info');
     if (activeMultiplier.turns > 0) {
@@ -2302,7 +2312,7 @@ function updateMultUI() {
     }
 }
 function openChest() {
-    if (isGameOverSequence || document.body.classList.contains('death-mode') || activeAnimations > 0 || playerKeys <= 0 || playerKeys >= 5)
+    if (isGameOverSequence || document.body.classList.contains('death-mode') || playerKeys <= 0 || playerKeys >= 5 || updateChestUI._megaPending)
         return;
     playerKeys--;
     stats.chestsOpened++;
