@@ -95,6 +95,7 @@
         "tut_cursed_title": "☠️ LANETLİ BLOKLAR",
         "tut_finish_title": "Hazırsın!",
         "tut_finish_sub": "Tüm temel mekaniği öğrendin. İyi oyunlar!",
+	"tut_wrong":"Bloğu yanlış yere yerleştirdin, tekrar dene!",
 
         "desc_multX": "Çarpan Bloğu: Mevcut skoru kombo değeriyle çarpar.",
         "tut_desc_minus": "Eksi Bloğu: Skoru belirli bir yüzde oranında azaltır. Ne kadar beklenirse ceza o kadar artar.",
@@ -206,6 +207,7 @@
         "tut_cursed_title": "☠️ CURSED BLOCKS",
         "tut_finish_title": "You're Ready!",
         "tut_finish_sub": "You've learned all the core mechanics. Have fun!",
+	"tut_wrong": "You misplaced the block, try again!",
 
         "desc_multX": "Multiplier Block: Multiplies your current score by the combo value.",
         "tut_desc_minus": "Minus Block: Reduces your score by a percentage. The longer it sits, the bigger the penalty.",
