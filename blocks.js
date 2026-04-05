@@ -1,14 +1,14 @@
 // Renk Paleti
-const PALETTE = ['#9AD914', '#e02b89', '#F2B749', '#F26938', '#D93A2B', '#854BBF', '#138AF2', '#5451A6', '#BFA77A', '#8C5332', '#5D84A6'];
+const PALETTE = ['#9AD914', '#e02b89', '#F2B749', '#F26938', '#ba2f22', '#854BBF', '#138AF2', '#5451A6', '#000000', '#db5385', '#5D84A6', '#46a83b'];
 
 function rollSpecialItem() {
     let roll = Math.random() * 100;
     if (roll < 2) return 'minus'; roll -= 2;
     if (roll < 0.5 && gameState.chestOddsLevel < 5) return 'upg'; roll -= 0.5;
-    if (roll < 0.5 && gameState.baseBlockScore < 35) return 'scoreUp'; roll -= 0.5;
-    if (roll < 0.35 && gameState.baseBlockScore > 1) return 'scoreDown'; roll -= 0.35;
+    if (roll < 0.6 && gameState.baseBlockScore < 35) return 'scoreUp'; roll -= 0.6;
+    if (roll < 0.45 && gameState.baseBlockScore > 1) return 'scoreDown'; roll -= 0.45;
     if (roll < 0.5) return 'cursedKey'; roll -= 0.5;
-    if (roll < 0.2) return 'life'; roll -= 0.2;
+    if (roll < 0.25) return 'life'; roll -= 0.25;
     if (roll < 0.2 && score > 20000 && !deathWave.active && score >= deathWave.nextEligibleScore) return 'skull'; roll -= 0.2;
     if (roll < 0.05) return 'multX'; roll -= 0.05;
     if (roll < 2) return '+'; roll -= 2;
