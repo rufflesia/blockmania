@@ -89,6 +89,7 @@ let activeJokerIndex = -1;
 let hammerLockedPos = null;
 let oneByOneLockedPos = null;
 let pendingJokerDrag = null;
+let megaChestPending = false;
 let jokerDragInfo = null;
 let jokerPressIsLong = false;
 let activeAnimations = 0;
@@ -453,7 +454,7 @@ document.addEventListener('pointermove', (e) => {
         const scaleRatio = targetCellWidth / 25; 
         
         const isTouch = e.pointerType === 'touch' || window.innerWidth <= 768;
-        const yOffset = isTouch ? -50 : 0; // Taşmayı önlemek için -60 yerine -50 yaptık
+        const yOffset = isTouch ? -60 : 0; // Taşmayı önlemek için -60 yerine -50 yaptık
         
         const dx = e.clientX - startDragInfo.startX;
         const dy = e.clientY - startDragInfo.startY + yOffset;
@@ -920,42 +921,44 @@ function formatScore(num) {
     return num.toString();
 }
 function spawnBgBlock() {
-    if (bgTimeout)
-        clearTimeout(bgTimeout);
+    if (bgTimeout) clearTimeout(bgTimeout);
     const container = document.getElementById('bg-blocks-container');
-    if (!container)
+    if (!container) return;
+
+    // Hard cap on simultaneous blocks — this alone prevents GPU overload on any device
+    // without needing to guess device capability from screen size
+    const maxBlocks = 40;
+    if (container.children.length >= maxBlocks) {
+        bgTimeout = setTimeout(spawnBgBlock, 500);
         return;
+    }
+
     const shape = ALL_SHAPES[Math.floor(Math.random() * ALL_SHAPES.length)];
     const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
     const pieceEl = document.createElement('div');
     pieceEl.className = 'bg-piece';
     pieceEl.style.gridTemplateColumns = `repeat(${shape[0].length}, 30px)`;
     pieceEl.style.left = `${Math.random() * 90}vw`;
+
     let activeCombo = (userSettings.motionEnabled === false) ? 0 : Math.min(combo, 6);
-    const isLowPower = window.innerWidth < 390; // iPhone mini-class screens
-    const maxComboEffect = isLowPower ? 3 : 6;  // cap speed boost at x3 on small phones
-    const cappedCombo = Math.min(activeCombo, maxComboEffect);
-    const fallDuration = 18 - (cappedCombo / maxComboEffect * 10);
+
+    // Fall speed: 18s at combo 0, 4s at combo 6
+    const fallDuration = 18 - (activeCombo / 6 * 16,8);
     pieceEl.style.animationDuration = `${fallDuration}s`;
+
     for (let r = 0; r < shape.length; r++)
         for (let c = 0; c < shape[0].length; c++) {
             const cell = document.createElement('div');
             cell.className = 'bg-piece-cell';
-            if (shape[r][c] === 1)
-                cell.style.backgroundColor = color;
+            if (shape[r][c] === 1) cell.style.backgroundColor = color;
             pieceEl.appendChild(cell);
         }
     container.appendChild(pieceEl);
-    setTimeout( () => {
-        if (pieceEl.parentNode)
-            pieceEl.remove();
-    }
-    , fallDuration * 1000);
-    const nextSpawn = 2900 - (activeCombo / 5 * 2600);
-    const isMobile = window.innerWidth <= 768;
-    const densityFactor = isMobile ? 4.5 : 1; // Mobilde bekleme süresini 2.5 kat uzat (daha az blok)
-    
-    bgTimeout = setTimeout(spawnBgBlock, nextSpawn * densityFactor);
+    setTimeout(() => { if (pieceEl.parentNode) pieceEl.remove(); }, fallDuration * 1000);
+
+    // Spawn interval: 3500ms at combo 0, 200ms at combo 6
+    const nextSpawn = 3450 - (activeCombo / 6 * 3300);
+    bgTimeout = setTimeout(spawnBgBlock, nextSpawn);
 }
 spawnBgBlock();
 function initBoardUI() {
@@ -1086,6 +1089,7 @@ function updateMinusTooltips() {
 function startGame() {
     isGameRunning = true;
     isGameOverSequence = false;
+    megaChestPending = false;
     activeAnimations = 0;
     score = 0;
     rawScore = 0;
@@ -1339,30 +1343,32 @@ function renderPieces() {
     }
 }
 function updateTrayPiecesState() {
-    // MOBİL VE ANİMASYON ÇAKIŞMA BUG'INI ÇÖZEN GECİKME (TIMEOUT)
-    // 300ms bekler ki ekrana geliş/büyüme animasyonları tamamen bitsin
     setTimeout(() => {
         for (let i = 0; i < 3; i++) {
-            if (!currentPiecesData[i] || currentPiecesData[i].used)
-                continue;
+            if (!currentPiecesData[i] || currentPiecesData[i].used) continue;
             const wrapper = document.getElementById(`pw-${i}`);
             let fits = false;
-            for (let r = 0; r < boardSize; r++)
-                for (let c = 0; c < boardSize; c++) {
-                    if (canPlace(boardState, currentPiecesData[i].s, r, c)) {
+            for (let r = 0; r < boardSize && !fits; r++)
+                for (let c = 0; c < boardSize && !fits; c++)
+                    if (canPlace(boardState, currentPiecesData[i].s, r, c))
                         fits = true;
-                        break;
-                    }
-                }
-	if (fits) {
-                wrapper.style.animation = '';
+
+            if (fits) {
                 wrapper.classList.remove('disabled');
+                wrapper.style.opacity = '';
+                wrapper.style.filter = '';
+                wrapper.style.pointerEvents = '';
             } else {
+                // Kill animation first, then apply styles inline so Safari
+                // compositor can't override them via the class transition
                 wrapper.style.animation = 'none';
                 wrapper.classList.add('disabled');
+                wrapper.style.opacity = '0.25';
+                wrapper.style.filter = 'grayscale(100%)';
+                wrapper.style.pointerEvents = 'none';
             }
         }
-    }, 500); // 300 Milisaniye Animasyon Bekleme Süresi
+    }, 650);
 }
 
 function saveHistory() {
@@ -1551,11 +1557,18 @@ function useHammerAt(r, c) {
                     } else {
                         if (type === 'K') {
                             activeAnimations++;
-                            flyItemToTarget(cell, 'K', document.getElementById('chest-btn'), () => {
-                                playerKeys++;
-                                updateChestUI();
-                            }
-                            );
+flyItemToTarget(cell, 'K', document.getElementById('chest-btn'), () => {
+            playerKeys++;
+            updateChestUI();
+            if (playerKeys >= 5 && !megaChestPending) {
+                megaChestPending = true;
+                setTimeout(() => {
+                    megaChestPending = false;
+                    openMegaChest();
+                }, 1000);
+            }
+        }
+        );
                         } else if (type !== 1) {
                             triggerSpecials(type, cell, r + i, c + j, true);
                         }
@@ -1609,6 +1622,10 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
         flyItemToTarget(cell, 'K', document.getElementById('chest-btn'), () => {
             playerKeys++;
             updateChestUI();
+	                if (playerKeys >= 5) {
+                clearTimeout(openMegaChest._t);
+                openMegaChest._t = setTimeout(openMegaChest, 1000);
+            }
         }
         );
     } else if (!isHammerOrArea) {
@@ -2060,8 +2077,8 @@ function checkGameOver() {
             return;
         }
 	let inDeathTurn = deathWave.inDeathTurn;
-        let inDeathMode = deathWave.active || deathWave.inDeathTurn;
-        let playableLifeline = !inDeathMode && (playerKeys > 0 || playerJokers.some(j => j.type !== 'undo' || historyState !== null));
+	let inDeathMode = deathWave.active || deathWave.inDeathTurn;
+        let playableLifeline = !inDeathMode && (playerKeys > 0 || playerJokers.some(j => j.type === 'hammer' || j.type === '1x1' || j.type === 'shuffle' || (j.type === 'undo' && historyState !== null)));
         if (!playableLifeline)
             triggerGameOverSequence();
     }
@@ -2289,10 +2306,6 @@ function updateChestUI() {
     const btn = document.getElementById('chest-btn');
     if (playerKeys >= 5) {
         btn.classList.add('ready', 'mega');
-        if (!updateChestUI._megaPending) {
-            updateChestUI._megaPending = true;
-            setTimeout(() => { updateChestUI._megaPending = false; openMegaChest(); }, 1000);
-        }
     } else if (playerKeys > 0) {
         btn.classList.add('ready');
         btn.classList.remove('mega');
@@ -2312,7 +2325,7 @@ function updateMultUI() {
     }
 }
 function openChest() {
-    if (isGameOverSequence || document.body.classList.contains('death-mode') || playerKeys <= 0 || playerKeys >= 5 || updateChestUI._megaPending)
+    if (isGameOverSequence || document.body.classList.contains('death-mode') || activeAnimations > 0 || playerKeys <= 0 || playerKeys >= 5)
         return;
     playerKeys--;
     stats.chestsOpened++;
@@ -2320,11 +2333,11 @@ function openChest() {
     popOutLoot(rollLoot(), 0);
 }
 function openMegaChest() {
-    if (isGameOverSequence || document.body.classList.contains('death-mode') || activeAnimations > 0)
+    if (isGameOverSequence || document.body.classList.contains('death-mode') || playerKeys < 5)
         return;
-	playerKeys = Math.max(0, playerKeys - 5);
-    	stats.megaChestsOpened++;
-    	updateChestUI();
+    playerKeys = Math.max(0, playerKeys - 5);
+    stats.megaChestsOpened++;
+    updateChestUI();
     	let guaranteedJoker = {
         type: 'joker',
         val: ['hammer', 'shuffle', 'undo', '1x1'][Math.floor(Math.random() * 4)]
