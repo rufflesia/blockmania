@@ -4,19 +4,19 @@ const PALETTE = ['#9AD914', '#e02b89', '#F2B749', '#F26938', '#ba2f22', '#854BBF
 function rollSpecialItem() {
     let roll = Math.random() * 100;
     if (roll < 2) return 'minus'; roll -= 2;
-    if (roll < 0.5 && gameState.chestOddsLevel < 5) return 'upg'; roll -= 0.5;
+    if (roll < 2.0 && gameState.chestOddsLevel < 30) return 'upg'; roll -= 2.0;
     if (roll < 0.6 && gameState.baseBlockScore < 35) return 'scoreUp'; roll -= 0.6;
     if (roll < 0.45 && gameState.baseBlockScore > 1) return 'scoreDown'; roll -= 0.45;
     if (roll < 0.5) return 'cursedKey'; roll -= 0.5;
     if (roll < 0.25) return 'life'; roll -= 0.25;
     if (roll < 0.2 && score > 20000 && !deathWave.active && score >= deathWave.nextEligibleScore) return 'skull'; roll -= 0.2;
     if (roll < 0.05) return 'multX'; roll -= 0.05;
-    if (roll < 2) return '+'; roll -= 2;
-    if (roll < 2.5) return 'row'; roll -= 2.5;
-    if (roll < 2.5) return 'col'; roll -= 2.5;
-    if (roll < 1.5) return '?'; roll -= 1.5;
-    if (roll < 0.1) return 'M'; roll -= 0.1;
-    if (roll < 1.0) return 'X'; roll -= 1.0;
+    if (roll < 2.2) return '+'; roll -= 2.2;
+    if (roll < 2.7) return 'row'; roll -= 2.7;
+    if (roll < 2.7) return 'col'; roll -= 2.7;
+    if (roll < 1.7) return '?'; roll -= 1.7;
+    if (roll < 0.15) return 'M'; roll -= 0.15;
+    if (roll < 1.2) return 'X'; roll -= 1.2;
     return null; 
 }
 
@@ -79,18 +79,29 @@ const KEY_HTML = getIconHTML('K');
 const STACK_KEY_HTML = `<img src="icons/key.png" style="width:100%; height:100%; object-fit:contain;" onerror="this.outerHTML='🔑'">`;
 
 function getLootTable() {
-    let u = gameState.chestOddsLevel;
-    let pts250 = 10 - u, pts500 = 15 - u, pts1000 = 10 - u, pts1500 = 5;
+    // 1. Yeni Kaydırmalı Skalalar
+    const CHEST_TIERS = [250, 500, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000];
+    
+    // Her 3 yükseltmede 1 index sağa kayar (Maksimum 7 kez kayabilir)
+    let shift = Math.floor(gameState.chestOddsLevel / 3);
+    shift = Math.min(shift, CHEST_TIERS.length - 4); 
+
+    // Yüzde eksiye düşüp matematiği bozmasın diye u'yu en fazla 9'da sabitliyoruz
+    let u = Math.min(gameState.chestOddsLevel, 9);
+    
+    let pts250_weight = 10 - u, pts500_weight = 15 - u, pts1000_weight = 10 - u, pts1500_weight = 5;
     let m3 = 25 - u, m5 = 10;
     let shuf = 8 + (u*2), ham = 8 + (u*2), undo = 8 + (u*2), x1 = 1 + (u*2);
     
     return [
-        { type: 'pts', val: 250, weight: pts250 }, { type: 'pts', val: 500, weight: pts500 }, { type: 'pts', val: 1000, weight: pts1000 }, { type: 'pts', val: 1500, weight: pts1500 },
+        { type: 'pts', val: CHEST_TIERS[shift], weight: pts250_weight }, 
+        { type: 'pts', val: CHEST_TIERS[shift + 1], weight: pts500_weight }, 
+        { type: 'pts', val: CHEST_TIERS[shift + 2], weight: pts1000_weight }, 
+        { type: 'pts', val: CHEST_TIERS[shift + 3], weight: pts1500_weight },
         { type: 'mult', val: 3, weight: m3 }, { type: 'mult', val: 5, weight: m5 },
         { type: 'joker', val: 'shuffle', weight: shuf }, { type: 'joker', val: 'hammer', weight: ham }, { type: 'joker', val: 'undo', weight: undo }, { type: 'joker', val: '1x1', weight: x1 }
     ];
 }
-
 // ÇEVİRİ MOTORUNA BAĞLANMIŞ SANDIK GANİMET YAZILARI
 function getLootData(loot) {
     let ptsText = typeof t === 'function' ? t('loot_pts') : "Puan";
