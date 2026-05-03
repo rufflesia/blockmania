@@ -33,28 +33,58 @@ function applyTranslations() {
         let key = el.getAttribute('data-i18n');
         el.innerText = t(key);
     });
+    updateLangButtonUI();
 }
 
 // 4. Dil Değiştirme Tetikleyicisi
 window.toggleLanguage = function() {
     if (!isDictLoaded) return;
-    currentLang = currentLang === 'tr' ? 'en' : 'tr';
+    
+    // 1. Desteklenen dillerin listesi (Yeni dilini buraya ekle)
+    const supportedLangs = ['tr', 'en', 'de', 'es', 'zh', 'ru', 'az']; 
+    
+    // 2. Sıradaki dile geçiş yap (Listenin sonuna gelince başa döner)
+    let currentIndex = supportedLangs.indexOf(currentLang);
+    currentIndex = (currentIndex + 1) % supportedLangs.length;
+    currentLang = supportedLangs[currentIndex];
+    
+    // 3. Hafızaya kaydet ve çevirileri ekrana bas
     localStorage.setItem('blockmania_lang', currentLang);
     applyTranslations();
     
-    // Vitrini güncelle
+    // 4. Ayarlar menüsündeki dil butonunun yazısını güncelle
+    updateLangButtonUI();
+
+    // Vitrini güncelle (mevcut kodunda varsa kalsın)
     if (typeof window.startCarousel === 'function' && typeof isGameRunning !== 'undefined' && !isGameRunning) {
         window.startCarousel();
     }
 };
+function updateLangButtonUI() {
+    const langBtnText = document.getElementById('lang-btn-text');
+    if (!langBtnText) return;
+
+    // Dil kodlarına karşılık gelen tam isimler
+    const langNames = {
+        'tr': 'Türkçe',
+        'en': 'English',
+        'de': 'Deutsch'
+    };
+
+    langBtnText.innerText = langNames[currentLang] || currentLang.toUpperCase();
+}
 // ==========================================
 
 // AYARLAR DEĞİŞKENİ HEMEN ALTINDA KALMAYA DEVAM ETMELİ:
 let userSettings = JSON.parse(localStorage.getItem('blockmania_settings')) || {
     volume: 100,
+    volumeBg: 70,
+    volumeSfx: 100,
     motionEnabled: true,
     fixedThemeColor: null
 };
+
+window.userSettings = userSettings;
 
 const boardSize = 9;
 let boardState = [];
@@ -102,18 +132,11 @@ let gameState = {
     chestOddsLevel: 0,
     cursedKeyActive: false
 };
-let deathWave = {
-    active: false,
-    counter: 0,
-    shapeDef: null,
-    nextEligibleScore: 20000,
-    inDeathTurn: false
-};
+
 
 let stats = {
     maxPointsInMove: 0,
     maxCombo: 0,
-    deathWavesSurvived: 0,
     chestsOpened: 0,
     megaChestsOpened: 0,
     maxBaseScore: 10,
@@ -201,6 +224,10 @@ function clearTooltip() {
         activeTooltipCell.classList.remove('show-tooltip');
         activeTooltipCell = null;
     }
+    // Global tooltip kapanışını tetikle
+    if (typeof window.hideSmartTooltip === 'function') {
+        window.hideSmartTooltip();
+    }
 }
 
 function loadScores() {
@@ -239,7 +266,6 @@ function saveGameState() {
         totalTurns,
         specialBlockStates,
         gameState,
-        deathWave,
         stats,
         gameThemeColor
     };
@@ -267,26 +293,16 @@ function loadAndResumeGame() {
         totalTurns = parsed.totalTurns;
         specialBlockStates = parsed.specialBlockStates;
         gameState = parsed.gameState;
-        deathWave = parsed.deathWave;
+        
         stats = parsed.stats;
         gameThemeColor = parsed.gameThemeColor;
 
         // Reset CSS state without touching deathWave data
-        document.body.classList.remove('death-mode', 'death-warning-mode');
+        
         document.getElementById('base-score-val').innerText = gameState.baseBlockScore;
         document.getElementById('score').innerText = formatScore(score);
-        if (deathWave.active) {
-            document.getElementById('normal-header-ui').style.display = 'none';
-            document.getElementById('death-header-ui').style.display = 'flex';
-            updateDeathWaveUI();
-            if (deathWave.inDeathTurn)
-                document.body.classList.add('death-mode');
-            else
-                document.body.classList.add('death-warning-mode');
-        } else {
-            document.getElementById('death-header-ui').style.display = 'none';
+            
             document.getElementById('normal-header-ui').style.display = 'flex';
-        }
         updateOddsUI();
         updateComboUI();
         updateChestUI();
@@ -320,7 +336,6 @@ function finalizeTurn() {
 function setGameState(state) {
     document.getElementById('start-header-ui').style.display = state === 'START' ? 'flex' : 'none';
     document.getElementById('normal-header-ui').style.display = (state === 'PLAYING' || state === 'GAMEOVER') ? 'flex' : 'none';
-    document.getElementById('death-header-ui').style.display = 'none';
     document.getElementById('gameover-btn-group').style.display = state === 'GAMEOVER' ? 'flex' : 'none';
 
     const interactiveStart = document.getElementById('interactive-start-area');
@@ -605,22 +620,33 @@ document.addEventListener('pointerdown', (e) => {
         return;
     let cell = e.target.closest('.cell') || e.target.closest('.piece-cell');
     let jokerSlot = e.target.closest('.joker-slot');
+// OYUN İÇİ AKILLI TOOLTIP TETİKLEYİCİ
     if (cell && cell.querySelector('.special-tooltip')) {
-        tooltipTimer = setTimeout( () => {
-            cell.classList.add('show-tooltip');
-            activeTooltipCell = cell;
-        }
-        , 300);
+        let textContent = cell.querySelector('.special-tooltip').innerHTML;
+        tooltipTimer = setTimeout(() => {
+            if (typeof window.showSmartTooltip === 'function') {
+                window.showSmartTooltip(cell, textContent);
+            }
+            activeTooltipCell = cell; // Temizlemek için referansı tutuyoruz
+        }, 300);
     }
-    if (jokerSlot && jokerSlot.classList.contains('has-item')) {
+if (jokerSlot && jokerSlot.classList.contains('has-item')) {
         let idx = parseInt(jokerSlot.id.replace('jk-', ''));
         jokerPressIsLong = false;
-        tooltipTimer = setTimeout( () => {
-            jokerSlot.classList.add('show-tooltip');
+        
+        // Jokerin içindeki gizli açıklama metnini bul
+        let tooltipEl = jokerSlot.querySelector('.special-tooltip');
+        let textContent = tooltipEl ? tooltipEl.innerHTML : '';
+
+        tooltipTimer = setTimeout(() => {
+            // YENİ AKILLI TOOLTIP SİSTEMİNİ ÇAĞIR
+            if (typeof window.showSmartTooltip === 'function') {
+                window.showSmartTooltip(jokerSlot, textContent);
+            }
             activeTooltipCell = jokerSlot;
             jokerPressIsLong = true;
-        }
-        , 300);
+        }, 300);
+        
         pendingJokerDrag = {
             index: idx,
             data: playerJokers[idx],
@@ -777,7 +803,7 @@ document.addEventListener('pointermove', (e) => {
             jokerPressIsLong = true;
             if (data.type === 'hammer' || data.type === '1x1') {
                 clearTooltip();
-                if (!isGameRunning || activeAnimations > 0 || document.body.classList.contains('death-mode'))
+                if (!isGameRunning || activeAnimations > 0)
                     return;
                 let iconSrc = data.type === 'hammer' ? 'icons/hammer_icon.png' : 'icons/random_block.png';
                 jokerDragInfo = {
@@ -831,9 +857,8 @@ document.addEventListener('pointermove', (e) => {
 
 function startDrag(e, index, data) {
     clearTooltip();
-    if (!isGameRunning || activeAnimations > 0 || currentPiecesData[index].used || activeJokerMode !== null || document.body.classList.contains('death-mode')) {
-        if (document.body.classList.contains('death-mode') && currentPiecesData[index].c === '#c0392b') {} else
-            return;
+    if (!isGameRunning || activeAnimations > 0 || currentPiecesData[index].used || activeJokerMode !== null) {
+        return;
     }
     draggingElement = document.getElementById(`pw-${index}`);
     draggingElement.classList.add('dragging');
@@ -853,7 +878,7 @@ function startDrag(e, index, data) {
     };
 }
 boardEl.addEventListener('pointerdown', (e) => {
-    if (!isGameRunning || activeAnimations > 0 || !activeJokerMode || document.body.classList.contains('death-mode'))
+    if (!isGameRunning || activeAnimations > 0 || !activeJokerMode)
         return;
     const rect = boardEl.getBoundingClientRect();
     let c = Math.floor((e.clientX - rect.left) / (rect.width / 9));
@@ -927,9 +952,9 @@ function spawnBgBlock() {
 
     // Hard cap on simultaneous blocks — this alone prevents GPU overload on any device
     // without needing to guess device capability from screen size
-    const maxBlocks = 40;
+    const maxBlocks = 100;
     if (container.children.length >= maxBlocks) {
-        bgTimeout = setTimeout(spawnBgBlock, 500);
+        bgTimeout = setTimeout(spawnBgBlock, 300);
         return;
     }
 
@@ -943,7 +968,7 @@ function spawnBgBlock() {
     let activeCombo = (userSettings.motionEnabled === false) ? 0 : Math.min(combo, 6);
 
     // Fall speed: 18s at combo 0, 4s at combo 6
-    const fallDuration = 18 - (activeCombo / 6 * 16,8);
+    const fallDuration = 19.5 - (activeCombo / 6 * 16.9);
     pieceEl.style.animationDuration = `${fallDuration}s`;
 
     for (let r = 0; r < shape.length; r++)
@@ -957,7 +982,7 @@ function spawnBgBlock() {
     setTimeout(() => { if (pieceEl.parentNode) pieceEl.remove(); }, fallDuration * 1000);
 
     // Spawn interval: 3500ms at combo 0, 200ms at combo 6
-    const nextSpawn = 3450 - (activeCombo / 6 * 3300);
+    const nextSpawn = 3450 - (activeCombo / 6 * 3395);
     bgTimeout = setTimeout(spawnBgBlock, nextSpawn);
 }
 spawnBgBlock();
@@ -977,29 +1002,45 @@ function updateComboUI(isBreak=false) {
     const display = document.getElementById('combo-display');
     const val = document.getElementById('combo');
     const comboContainer = document.querySelector('.combo-box');
+
+    // Çarpanın aktif olup olmadığını kontrol et
+    let isMultActive = activeMultiplier.active && activeMultiplier.turns > 0;
+    
+    // Çarpan aktifse ekranda görünen kombo değerini 5 ile çarp
+    let displayCombo = isMultActive ? (combo * 5) : combo;
+
+    // Kırılma (Break) Efekti: Sadece gerçek combo 1'e düştüğünde ve isBreak true ise
     if (isBreak && combo === 1) {
         display.classList.remove('pop');
         display.classList.add('break');
         comboContainer.classList.remove('shaking');
-        setTimeout( () => {
+        setTimeout(() => {
             display.style.opacity = '0';
             display.classList.remove('break');
-        }
-        , 600);
-    } else if (combo > 1) {
+        }, 600);
+    } 
+    // Kombo veya Çarpan varsa göster ve sarsıntı efektini uygula
+    else if (displayCombo > 1 || isMultActive) {
         display.classList.remove('break');
         display.style.opacity = '1';
-        val.innerText = combo;
+        val.innerText = displayCombo; // Çarpılmış değeri yazdır
+        
+        // Pop efektini yeniden tetikle
         display.classList.remove('pop');
-        void display.offsetWidth;
+        void display.offsetWidth; // Reflow hilesi (Animasyonu anında baştan başlatır)
         display.classList.add('pop');
-        if (combo > 2) {
-            let intensity = (Math.min(combo, 6) - 1) / 12;
+        
+        // Sarsıntı Şiddeti (Intensity) Hesaplaması
+        if (displayCombo > 1) {
+            // Çarpan aktifse sarsıntıyı direkt yüksek seviyeden (agresif) başlat
+            let baseIntensity = isMultActive ? 4 : 1; 
+            let intensity = (Math.min(displayCombo + baseIntensity, 6) - 1) / 12;
+            
             comboContainer.classList.add('shaking');
-            comboContainer.style.setProperty('--shake-rot', (2 + intensity * 18) + 'deg');
-            comboContainer.style.setProperty('--shake-x', (1 + intensity * 14) + 'px');
-            comboContainer.style.setProperty('--shake-y', (1 + intensity * 14) + 'px');
-            comboContainer.style.setProperty('--shake-speed', (0.5 - intensity * 0.45) + 's');
+            comboContainer.style.setProperty('--shake-rot', (2 + intensity * 20) + 'deg');
+            comboContainer.style.setProperty('--shake-x', (1 + intensity * 15) + 'px');
+            comboContainer.style.setProperty('--shake-y', (1 + intensity * 15) + 'px');
+            comboContainer.style.setProperty('--shake-speed', (0.5 - intensity * 0.35) + 's');
         } else {
             comboContainer.classList.remove('shaking');
         }
@@ -1007,6 +1048,8 @@ function updateComboUI(isBreak=false) {
         display.style.opacity = '0';
         comboContainer.classList.remove('shaking');
     }
+
+    // Kalkan (Shield) UI Güncellemesi
     const shieldUI = document.getElementById('life-shield-ui');
     if (gameState.lifeTurns > 0) {
         shieldUI.style.display = 'block';
@@ -1014,8 +1057,11 @@ function updateComboUI(isBreak=false) {
     } else {
         shieldUI.style.display = 'none';
     }
-    if (combo > stats.maxCombo)
-        stats.maxCombo = combo;
+
+    // İstatistikler: Maksimum kombo değerine (rekorlara) bu devasa sayıyı da dahil et
+    if (displayCombo > stats.maxCombo) {
+        stats.maxCombo = displayCombo;
+    }
 }
 function playShieldAnim() {
     const header = document.getElementById('main-header');
@@ -1065,16 +1111,35 @@ function playShieldAnim() {
     setTimeout( () => cont.remove(), 2600);
 }
 function updateOddsUI() {
-    let u = gameState.chestOddsLevel;
-    document.getElementById('odd-pts250').innerText = `%${10 - u}`;
-    document.getElementById('odd-pts500').innerText = `%${15 - u}`;
-    document.getElementById('odd-pts1000').innerText = `%${10 - u}`;
-    document.getElementById('odd-pts1500').innerText = `%5`;
+    const CHEST_TIERS = [250, 500, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000];
+    let shift = Math.floor(gameState.chestOddsLevel / 3);
+    shift = Math.min(shift, CHEST_TIERS.length - 4);
+    
+    // Ekranda yazan sayıları listendeki kaydırmaya göre otomatik güncelle
+    document.getElementById('label-pts1').innerText = CHEST_TIERS[shift];
+    document.getElementById('label-pts2').innerText = CHEST_TIERS[shift + 1];
+    document.getElementById('label-pts3').innerText = CHEST_TIERS[shift + 2];
+    document.getElementById('label-pts4').innerText = CHEST_TIERS[shift + 3];
+
+    let u = Math.min(gameState.chestOddsLevel, 9); // Görsel ihtimaller eksilere düşmesin
+    
+    document.getElementById('odd-pts1').innerText = `%${10 - u}`;
+    document.getElementById('odd-pts2').innerText = `%${15 - u}`;
+    document.getElementById('odd-pts3').innerText = `%${10 - u}`;
+    document.getElementById('odd-pts4').innerText = `%5`;
     document.getElementById('odd-m3').innerText = `%${25 - u}`;
     document.getElementById('odd-m5').innerText = `%10`;
     document.getElementById('odd-joker').innerText = `%${24 + (u * 6)}`;
+    
+    // 1x1 Jokeri için yüzde ihtimali geri geldi
     document.getElementById('odd-x1').innerText = `%${1 + (u * 2)}`;
+    
+    // Yeni eklediğimiz Seviye sayacı
+    if (document.getElementById('odd-level')) {
+        document.getElementById('odd-level').innerText = `${gameState.chestOddsLevel} / 30`;
+    }
 }
+
 function updateMinusTooltips() {
     for (let key in specialBlockStates) {
         let[r,c] = key.split(',').map(Number);
@@ -1109,7 +1174,6 @@ function startGame() {
     stats = {
         maxPointsInMove: 0,
         maxCombo: 0,
-        deathWavesSurvived: 0,
         chestsOpened: 0,
         megaChestsOpened: 0,
         maxBaseScore: 10,
@@ -1125,19 +1189,6 @@ function startGame() {
         chestOddsLevel: 0,
         cursedKeyActive: false
     };
-    deathWave = {
-        active: false,
-        counter: 0,
-        shapeDef: null,
-        nextEligibleScore: 20000,
-        inDeathTurn: false
-    };
-    endDeathWave();
-    document.getElementById('base-score-val').innerText = gameState.baseBlockScore;
-    document.getElementById('score').innerText = formatScore(score);
-    if(document.getElementById('score-bar-label')) {
-        document.getElementById('score-bar-label').style.display = 'none';
-    }
     updateOddsUI();
     updateComboUI();
     updateChestUI();
@@ -1149,103 +1200,8 @@ function startGame() {
     saveGameState();
 }
 
-function updateDeathWaveUI() {
-    document.getElementById('dw-sets-left').innerText = deathWave.counter;
-    const mini = document.getElementById('dw-miniature');
-    mini.innerHTML = '';
-    let shape = deathWave.shapeDef.s;
-    mini.style.gridTemplateColumns = `repeat(${shape[0].length}, 14px)`;
-    for (let r = 0; r < shape.length; r++) {
-        for (let c = 0; c < shape[0].length; c++) {
-            let cEl = document.createElement('div');
-            if (shape[r][c] === 1)
-                cEl.className = 'dw-mini-cell';
-            mini.appendChild(cEl);
-        }
-    }
-}
-function endDeathWave() {
-    if (deathWave.active)
-        stats.deathWavesSurvived++;
-    deathWave.inDeathTurn = false;
-    deathWave.active = false;
-    document.body.classList.remove('death-mode', 'death-warning-mode');
-    document.getElementById('death-header-ui').style.display = 'none';
-    document.getElementById('normal-header-ui').style.display = 'flex';
-    document.getElementById('score').innerText = formatScore(score);
-}
-function triggerDeathWave() {
-    deathWave.active = true;
-    deathWave.counter = 5;
-    deathWave.shapeDef = DEATH_SHAPES[Math.floor(Math.random() * DEATH_SHAPES.length)];
-    deathWave.nextEligibleScore = score + 25000;
-    document.body.classList.add('death-warning-mode');
-    document.getElementById('normal-header-ui').style.display = 'none';
-    document.getElementById('death-header-ui').style.display = 'flex';
-    updateDeathWaveUI();
-}
 
 function generatePieces(isShuffle=false) {
-    if (!isShuffle) {
-        if (deathWave.inDeathTurn) {
-            endDeathWave();
-        }
-        if (deathWave.active && deathWave.counter === 0) {
-            deathWave.inDeathTurn = true;
-            document.body.classList.remove('death-warning-mode');
-            document.body.classList.add('death-mode');
-            currentPiecesData = [{
-                s: [[0]],
-                c: 'transparent',
-                used: true,
-                hasSpecial: false,
-                specialType: null,
-                specialPos: null,
-                hasKey: false,
-                keyPos: null
-            }, {
-                s: deathWave.shapeDef.s,
-                c: '#c0392b',
-                used: false,
-                hasSpecial: false,
-                specialType: null,
-                specialPos: null,
-                hasKey: false,
-                keyPos: null
-            }, {
-                s: [[0]],
-                c: 'transparent',
-                used: true,
-                hasSpecial: false,
-                specialType: null,
-                specialPos: null,
-                hasKey: false,
-                keyPos: null
-            }];
-            renderPieces();
-            activeAnimations++;
-            setTimeout( () => {
-                updateTrayPiecesState();
-                activeAnimations--;
-                finalizeTurn();
-            }
-            , 600);
-            return;
-        }
-        if (deathWave.active && deathWave.counter > 0) {
-            deathWave.counter--;
-            updateDeathWaveUI();
-            if (deathWave.counter === 0) {
-                document.getElementById('dw-rounds-label').style.display = 'none';
-		document.getElementById('dw-sets-left').innerHTML = `<span style="font-size: 1.5rem; font-weight: bold; color: #e74c3c;">${t('death_warning')}</span>`;
-            }
-        }
-        if (!deathWave.active && score >= 20000 && score >= deathWave.nextEligibleScore) {
-            if (Math.random() < 0.05) {
-                triggerDeathWave();
-            }
-        }
-    }
     currentPiecesData = Array(3).fill().map( () => {
         let s;
         let r = Math.random();
@@ -1278,7 +1234,12 @@ function generatePieces(isShuffle=false) {
         if (specType) {
             specPos = ones[Math.floor(Math.random() * ones.length)];
         } else {
-            let keyChance = gameState.cursedKeyActive ? 0.025 : 0.10;
+            // YENİ MANTIK: Tahtada (grid) 'cursedKey' var mı diye tüm satırları kontrol et
+            let isCursedOnGrid = boardState.some(row => row.includes('cursedKey'));
+            
+            // Gridde durduğu sürece anahtar çıkma ihtimali %0, yoksa normal ihtimal (%10)
+            let keyChance = isCursedOnGrid ? 0 : 0.10;
+            
             if (Math.random() < keyChance) {
                 hasKey = true;
                 keyPos = ones[Math.floor(Math.random() * ones.length)];
@@ -1297,13 +1258,14 @@ function generatePieces(isShuffle=false) {
     }
     );
     renderPieces();
+    if(typeof SFX!=='undefined') SFX.newTray();
     activeAnimations++;
     setTimeout( () => {
         updateTrayPiecesState();
         activeAnimations--;
         finalizeTurn();
     }
-    , 600);
+    , 800);
 }
 
 function renderPieces() {
@@ -1315,6 +1277,11 @@ function renderPieces() {
         wrapper.style.animation = 'none';
         wrapper.offsetHeight;
         wrapper.style.animation = null;
+        
+        // BUG FIX: Eski turdan kalan kararma (disabled) inline stillerini temizle
+        wrapper.style.opacity = '';
+        wrapper.style.filter = '';
+        wrapper.style.pointerEvents = '';
         wrapper.style.visibility = currentPiecesData[i].used ? 'hidden' : 'visible';
         if (currentPiecesData[i].used)
             continue;
@@ -1358,6 +1325,7 @@ function updateTrayPiecesState() {
                 wrapper.style.opacity = '';
                 wrapper.style.filter = '';
                 wrapper.style.pointerEvents = '';
+                wrapper.style.animation = 'none';
             } else {
                 // Kill animation first, then apply styles inline so Safari
                 // compositor can't override them via the class transition
@@ -1368,7 +1336,7 @@ function updateTrayPiecesState() {
                 wrapper.style.pointerEvents = 'none';
             }
         }
-    }, 650);
+    }, 850);
 }
 
 function saveHistory() {
@@ -1380,7 +1348,7 @@ function saveHistory() {
             ...activeMultiplier
         },
         gs: JSON.parse(JSON.stringify(gameState)),
-        dw: JSON.parse(JSON.stringify(deathWave)),
+        
         totalTurns: totalTurns,
         specialStates: JSON.parse(JSON.stringify(specialBlockStates)),
         earnedPoints: 0,
@@ -1452,6 +1420,7 @@ function placePiece(shape, startR, startC, color, hasSpec, specType, specPos, ha
                     boardState[br][bc] = 1;
                 const cell = boardEl.children[br * boardSize + bc];
                 cell.classList.add('filled');
+		if(typeof SFX!=='undefined') SFX.place();
                 cell.style.backgroundColor = color;
                 if (isSpecCell) {
                     cell.innerHTML = getIconHTML(specType, br, bc);
@@ -1464,6 +1433,8 @@ function placePiece(shape, startR, startC, color, hasSpec, specType, specPos, ha
 }
 
 function confirmOneByOne(r, c) {
+    
+    if(typeof SFX!=='undefined') SFX.randomBlock();
     let idx = activeJokerIndex;
     activeJokerMode = null;
     oneByOneLockedPos = null;
@@ -1521,6 +1492,7 @@ function useHammerAt(r, c) {
     saveHistory();
     stats.hammersUsed++;
     document.body.classList.add('shake-3');
+    if(typeof SFX!=='undefined') SFX.hammerCrack();
     setTimeout( () => document.body.classList.remove('shake-3'), 500);
     const bRect = boardEl.getBoundingClientRect();
     const cellW = bRect.width / 9;
@@ -1614,11 +1586,11 @@ flyItemToTarget(cell, 'K', document.getElementById('chest-btn'), () => {
 function triggerSpecials(type, cell, r, c, isHammerOrArea) {
     let scoreMod = 0;
     if (type === 'K') {
+        if(typeof SFX!=='undefined') SFX.key();
         if (historyState)
             historyState.earnedKeys++;
         activeAnimations++;
-        if (gameState.cursedKeyActive)
-            gameState.cursedKeyActive = false;
+        
         flyItemToTarget(cell, 'K', document.getElementById('chest-btn'), () => {
             playerKeys++;
             updateChestUI();
@@ -1630,6 +1602,7 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
         );
     } else if (!isHammerOrArea) {
         if (type === 'life') {
+            if(typeof SFX!=='undefined') SFX.life();
             playShieldAnim();
             gameState.lifeTurns = 7;
             updateComboUI();
@@ -1661,12 +1634,14 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
             }
             , 850);
         } else if (type === 'upg') {
-            if (gameState.chestOddsLevel < 5) {
+            if(typeof SFX!=='undefined') SFX.chestUpg();
+            if (gameState.chestOddsLevel < 30) {
                 gameState.chestOddsLevel++;
                 updateOddsUI();
                 document.querySelector('.info-btn').classList.add('upgrade-notification');
             }
         } else if (type === 'scoreUp') {
+ 	    if(typeof SFX!=='undefined') SFX.scoreUp();
             if (gameState.baseBlockScore < 35) {
                 gameState.baseBlockScore++;
                 updateBaseScoreUI(true);
@@ -1674,16 +1649,16 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
                     stats.maxBaseScore = gameState.baseBlockScore;
             }
         } else if (type === 'scoreDown') {
+	    if(typeof SFX!=='undefined') SFX.scoreDown();
             if (gameState.baseBlockScore > 1) {
                 gameState.baseBlockScore--;
                 updateBaseScoreUI(false);
             }
         } else if (type === 'skull') {
-            if (!deathWave.active && score > 20000)
-                triggerDeathWave();
+            
         } else if (type === 'cursedKey') {
-            gameState.cursedKeyActive = true;
         } else if (type === 'minus') {
+            if(typeof SFX!=='undefined') SFX.minusLaugh();
             let pct = 5;
             if (specialBlockStates[`${r},${c}`]) {
                 let age = totalTurns - specialBlockStates[`${r},${c}`].turnPlaced;
@@ -1758,6 +1733,7 @@ function executeAreaChains(areas, chainCombo) {
         combo++;
         updateComboUI();
         fireAgroMultiplier(Math.min(combo, 10));
+	if(typeof SFX!=='undefined') SFX.areaBlock();
         let earnedPoints = 0;
         let newAreas = [];
         const originCell = boardEl.children[area.r * 9 + area.c];
@@ -1925,6 +1901,10 @@ function checkBoardLogic(isFreeTurn=false) {
         }
     } else {
         if (!isFreeTurn) {
+            if (activeMultiplier.active && activeMultiplier.turns > 0) {
+                activeMultiplier.turns--;
+                updateMultUI();
+            }
             if (gameState.lifeTurns > 0) {
                 gameState.lifeTurns--;
                 updateComboUI();
@@ -1935,10 +1915,6 @@ function checkBoardLogic(isFreeTurn=false) {
                     updateComboUI(true);
                 else
                     updateComboUI();
-            }
-            if (activeMultiplier.active && activeMultiplier.turns > 0) {
-                activeMultiplier.turns--;
-                updateMultUI();
             }
             if (historyState)
                 historyState.earnedPoints = 0;
@@ -2048,21 +2024,6 @@ function isTrapState(simBoard, remPieces) {
     }
     return true;
 }
-function executeDeathPenalty() {
-    activeAnimations++;
-    score = Math.max(0, score - 10000);
-    document.getElementById('score').innerText = formatScore(score);
-    showPraise(t('death_penalty'), "#e74c3c");
-    document.body.classList.add('shake-3');
-    setTimeout( () => document.body.classList.remove('shake-3'), 500);
-    endDeathWave();
-    setTimeout( () => {
-        generatePieces();
-        activeAnimations--;
-        checkGameOver();
-    }
-    , 1500);
-}
 
 // NİHAİ GAME OVER EKRANI (AÇIK MOD)
 function checkGameOver() {
@@ -2072,15 +2033,9 @@ function checkGameOver() {
     if (av.length === 0)
         return;
     if (isTrapState(boardState, av)) {
-        if (deathWave.inDeathTurn) {
-            executeDeathPenalty();
-            return;
-        }
-	let inDeathTurn = deathWave.inDeathTurn;
-	let inDeathMode = deathWave.active || deathWave.inDeathTurn;
-        let playableLifeline = !inDeathMode && (playerKeys > 0 || playerJokers.some(j => j.type === 'hammer' || j.type === '1x1' || j.type === 'shuffle' || (j.type === 'undo' && historyState !== null)));
-        if (!playableLifeline)
-            triggerGameOverSequence();
+        let playableLifeline = (playerKeys > 0 || playerJokers.some(j => j.type === 'hammer' || j.type === '1x1' || j.type === 'shuffle' || (j.type === 'undo' && historyState !== null)));
+if (!playableLifeline)
+    triggerGameOverSequence();
     }
 }
 
@@ -2095,7 +2050,8 @@ function triggerGameOverSequence() {
             let pw = document.getElementById(`pw-${i}`);
             pw.style.animation = 'none';
             pw.offsetHeight;
-            document.getElementById(`pw-${i}`).classList.add('no-fit-anim');
+            pw.style.animation = ''; 
+            pw.classList.add('no-fit-anim');
         }
 
     setTimeout( () => {
@@ -2325,18 +2281,20 @@ function updateMultUI() {
     }
 }
 function openChest() {
-    if (isGameOverSequence || document.body.classList.contains('death-mode') || activeAnimations > 0 || playerKeys <= 0 || playerKeys >= 5)
+    if (isGameOverSequence || activeAnimations > 0 || playerKeys <= 0 || playerKeys >= 5)
         return;
     playerKeys--;
     stats.chestsOpened++;
+    if(typeof SFX!=='undefined') SFX.chestOpen();
     updateChestUI();
     popOutLoot(rollLoot(), 0);
 }
 function openMegaChest() {
-    if (isGameOverSequence || document.body.classList.contains('death-mode') || playerKeys < 5)
+    if (isGameOverSequence || playerKeys < 5)
         return;
     playerKeys = Math.max(0, playerKeys - 5);
     stats.megaChestsOpened++;
+    if(typeof SFX!=='undefined') SFX.chestOpen();
     updateChestUI();
     	let guaranteedJoker = {
         type: 'joker',
@@ -2558,6 +2516,16 @@ function popOutLoot(loot, delay) {
                                         activeMultiplier.turns = loot.val;
                                     }
                                     updateMultUI();
+if (typeof updateComboUI === 'function') {
+        updateComboUI(); 
+    }
+    
+    // Opsiyonel: Sadece o an için ekstra bir sarsıntı efekti ekle
+    const comboBox = document.querySelector('.combo-box');
+    if (comboBox) {
+        comboBox.classList.add('pop');
+        setTimeout(() => comboBox.classList.remove('pop'), 500);
+    }
                                 } else if (loot.type === 'joker') {
                                     let jData = {
                                         type: loot.val
@@ -2627,7 +2595,7 @@ function updateJokerUI() {
     }
 }
 function activateJoker(idx) {
-    if (isGameOverSequence || activeAnimations > 0 || document.body.classList.contains('death-mode'))
+    if (isGameOverSequence || activeAnimations > 0)
         return;
     let j = playerJokers[idx];
     if (!j)
@@ -2641,6 +2609,7 @@ function activateJoker(idx) {
         return;
     }
     if (j.type === 'undo') {
+ 	if(typeof SFX!=='undefined') SFX.undo();
         if (!historyState)
             return;
         boardState = historyState.board.map(row => [...row]);
@@ -2663,16 +2632,6 @@ function activateJoker(idx) {
             playerKeys -= historyState.earnedKeys;
             if (playerKeys < 0)
                 playerKeys = 0;
-        }
-        if (historyState.dw)
-            deathWave = JSON.parse(JSON.stringify(historyState.dw));
-        if (deathWave.active && !deathWave.inDeathTurn) {
-            document.getElementById('death-header-ui').style.display = 'flex';
-            document.getElementById('normal-header-ui').style.display = 'none';
-            updateDeathWaveUI();
-        } else if (!deathWave.active) {
-            document.getElementById('death-header-ui').style.display = 'none';
-            document.getElementById('normal-header-ui').style.display = 'flex';
         }
         updateComboUI();
         updateChestUI();
@@ -2730,8 +2689,6 @@ let sessHtml = '';
         sessHtml += `<li>${t('stat_blocks_move')}: <span>${stats.maxBlocksInMove}</span></li>`;
     if (stats.maxCombo > 1)
         sessHtml += `<li>${t('stat_max_combo')}: <span>x${stats.maxCombo}</span></li>`;
-    if (stats.deathWavesSurvived > 0)
-        sessHtml += `<li>${t('stat_death_survived')}: <span>${stats.deathWavesSurvived}</span></li>`;
     if (stats.chestsOpened > 0)
         sessHtml += `<li>${t('stat_chests')}: <span>${stats.chestsOpened}</span></li>`;
     if (stats.megaChestsOpened > 0)
@@ -2838,7 +2795,7 @@ window.returnToMainMenu = function() {
 
     // Header'ı başlangıç haline getir
     document.getElementById('normal-header-ui').style.display = 'none';
-    document.getElementById('death-header-ui').style.display = 'none';
+    
     document.getElementById('start-header-ui').style.display = 'flex';
     
     // Skoru sıfırla ve Tahtayı temizle
@@ -2941,6 +2898,14 @@ function saveUserSettings() {
 function initSettingsUI() {
     document.getElementById('volume-slider').value = userSettings.volume;
     document.getElementById('vol-val-text').innerText = userSettings.volume + '%';
+    if (document.getElementById('volume-bg-slider')) {
+        document.getElementById('volume-bg-slider').value = userSettings.volumeBg ?? 70;
+        document.getElementById('vol-bg-text').innerText = (userSettings.volumeBg ?? 70) + '%';
+    }
+    if (document.getElementById('volume-sfx-slider')) {
+        document.getElementById('volume-sfx-slider').value = userSettings.volumeSfx ?? 100;
+        document.getElementById('vol-sfx-text').innerText = (userSettings.volumeSfx ?? 100) + '%';
+    }
     
     document.getElementById('motion-toggle').checked = userSettings.motionEnabled;
 
@@ -2976,6 +2941,20 @@ window.updateVolume = function(val) {
     userSettings.volume = val;
     document.getElementById('vol-val-text').innerText = val + '%';
     saveUserSettings();
+    if (typeof SFX !== 'undefined') SFX.applyVolumes();
+};
+
+window.updateVolumeBg = function(val) {
+    userSettings.volumeBg = parseInt(val);
+    document.getElementById('vol-bg-text').innerText = val + '%';
+    saveUserSettings();
+    if (typeof SFX !== 'undefined') SFX.applyVolumes();
+};
+window.updateVolumeSfx = function(val) {
+    userSettings.volumeSfx = parseInt(val);
+    document.getElementById('vol-sfx-text').innerText = val + '%';
+    saveUserSettings();
+    if (typeof SFX !== 'undefined') SFX.applyVolumes();
 };
 
 window.toggleMotion = function(isChecked) {
@@ -3050,6 +3029,27 @@ if (themeSlider) {
         themeSlider.scrollLeft = scrollLeft - walk;
     });
 }
+
+function checkDeviceOrientation() {
+    const rotateOverlay = document.getElementById('rotate-overlay');
+    if (!rotateOverlay) return;
+
+    // Eğer ekranın genişliği yüksekliğinden fazlaysa (Yan döndüyse)
+    // ve cihaz bir dokunmatik ekransa
+    if (window.innerWidth > window.innerHeight && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
+        rotateOverlay.style.setProperty('display', 'flex', 'important');
+    } else {
+        // Dikey moddaysa gizle
+        rotateOverlay.style.setProperty('display', 'none', 'important');
+    }
+}
+
+// Hem ekran boyutu değiştiğinde hem de cihaz döndürüldüğünde kontrol et
+window.addEventListener('resize', checkDeviceOrientation);
+window.addEventListener('orientationchange', checkDeviceOrientation);
+
+// Oyun ilk açıldığında da bir kez kontrol et
+checkDeviceOrientation();
 
 if ('serviceWorker'in navigator) {
     window.addEventListener('load', () => {
