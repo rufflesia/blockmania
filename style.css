@@ -36,43 +36,7 @@ body {
     position: relative;
 }
 
-body.death-warning-mode .header {
-    background: #2c3e50;
-    border: 2px solid #e74c3c;
-    box-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
-}
 
-body.death-warning-mode .header .score-value, body.death-warning-mode .header .score-label {
-    color: #fff;
-}
-
-body.death-mode .header {
-    background: #111;
-    border: 2px solid #c0392b;
-    box-shadow: 0 0 30px rgba(192, 57, 43, 0.8);
-}
-
-body.death-mode .score-tools {
-    filter: grayscale(100%);
-    pointer-events: none;
-    opacity: 0.3;
-}
-
-body.death-mode .header .score-value {
-    color: #fff;
-}
-
-body.death-mode .header .score-label {
-    color: #e74c3c;
-}
-
-.dw-mini-cell {
-    width: 14px;
-    height: 14px;
-    background-color: #e74c3c;
-    border-radius: 3px;
-    box-shadow: 0 0 5px #e74c3c;
-}
 
 #bg-blocks-container {
     position: absolute;
@@ -90,8 +54,8 @@ body.death-mode .header .score-label {
     display: grid;
     gap: 2px;
     opacity: 0.15;
-    filter: blur(1px);
     animation: fallAnimation linear forwards;
+    will-change: transform;
 }
 
 .bg-piece-cell {
@@ -678,34 +642,6 @@ button.btn-primary:hover {
     animation: slam 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-#death-counter-ui {
-    position: absolute;
-    top: clamp(80px, 15vh, 120px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.8);
-    color: #e74c3c;
-    padding: 10px 25px;
-    border-radius: 30px;
-    font-size: clamp(1rem, 4vw, 1.5rem);
-    font-weight: 900;
-    border: 2px solid #e74c3c;
-    z-index: 40;
-    display: none;
-    white-space: nowrap;
-    animation: smokeAnim 2s infinite alternate;
-    pointer-events: none;
-}
-
-@keyframes smokeAnim {
-    0% {
-        box-shadow: 0 0 15px #e74c3c, 0 15px 20px -10px rgba(255,0,0,0.6);
-    }
-
-    100% {
-        box-shadow: 0 0 35px #e74c3c, 0 -15px 20px -10px rgba(255,0,0,0.6);
-    }
-}
 
 /* OYUN TAHTASI */
 #board {
@@ -927,35 +863,53 @@ button.btn-primary:hover {
 }
 
 .special-tooltip {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%) translateY(5px);
-    background: rgba(44, 62, 80, 0.9);
+    position: fixed;
+    background: rgba(44, 62, 80, 0.95);
     color: #ecf0f1;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 0.85rem;
     font-weight: bold;
-    white-space: nowrap;
+    white-space: normal;
+    word-wrap: break-word;
+    max-width: 220px;
+    width: max-content;
+    text-align: center;
     pointer-events: none;
+    z-index: 999999;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    
+    /* YAVAŞ VE AŞAĞIDAN YUKARI ANİMASYON */
     opacity: 0;
     visibility: hidden;
-    transition: 0.2s ease;
-    z-index: 100005;
-    margin-bottom: 5px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transform: translate(-50%, -80%); /* Başlangıçta biraz daha aşağıda */
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), visibility 0.4s;
 }
 
+.special-tooltip.show-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -100%); /* Hedef konumuna (yukarı) çıkar */
+}
+
+/* OK (ÜÇGEN) AYARI */
 .special-tooltip::after {
     content: '';
     position: absolute;
     top: 100%;
-    left: 50%;
+    /* Burası JS tarafından değiştirilecek, varsayılan %50 */
+    left: var(--arrow-x, 50%); 
     transform: translateX(-50%);
-    border-width: 5px;
+    border-width: 7px;
     border-style: solid;
-    border-color: rgba(44, 62, 80, 0.9) transparent transparent transparent;
+    border-color: rgba(44, 62, 80, 0.95) transparent transparent transparent;
+    transition: left 0.3s ease; /* Metin kaysa da ok yumuşakça yerinde kalsın */
+}
+
+/* Üstten taşma durumunda ok yukarı geçerse */
+.special-tooltip.tooltip-bottom::after {
+    top: -14px;
+    border-color: transparent transparent rgba(44, 62, 80, 0.95) transparent;
 }
 
 .cell.show-tooltip .special-tooltip, .piece-cell.show-tooltip .special-tooltip, .joker-slot.show-tooltip .special-tooltip {
@@ -1018,13 +972,11 @@ button.btn-primary:hover {
     justify-content: center;
     align-items: center;
     -webkit-user-select: none;
-    transform-style: preserve-3d;
-    will-change: transform;
     user-select: none;
     cursor: grab;
     touch-action: none;
     transition: transform 0.2s ease-out, opacity 0.3s, filter 0.3s;
-    animation: smoothEntry 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
+    animation: smoothEntry 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
 }
 
 #pw-0 {
