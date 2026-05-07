@@ -126,14 +126,7 @@
                 gap: 14px;
             }
 
-            #bm-logo {
-                width: 72%;
-                max-width: 280px;
-                height: auto;
-                object-fit: contain;
-                filter: drop-shadow(0 4px 20px rgba(0,0,0,0.6));
-                margin-bottom: 6px;
-            }
+            
 
             #bm-loading-label {
                 color: rgba(255,255,255,0.75);
@@ -207,14 +200,7 @@
         const content = document.createElement('div');
         content.id = 'bm-loading-content';
 
-        // Logo
-        const logo = document.createElement('img');
-        logo.id = 'bm-logo';
-        logo.src = 'blockmania.png';
-        logo.alt = 'BlockMania';
-        logo.onerror = function () {
-            this.outerHTML = '<div style="font-size:2.2rem;font-weight:900;color:white;letter-spacing:2px;text-shadow:0 4px 20px rgba(0,0,0,.6);">BLOCKMANIA</div>';
-        };
+       
 
         // Label
         const label = document.createElement('div');
@@ -233,7 +219,7 @@
         pctEl.id = 'bm-pct';
         pctEl.innerText = '0%';
 
-        content.appendChild(logo);
+       
         content.appendChild(label);
         content.appendChild(track);
         content.appendChild(pctEl);
