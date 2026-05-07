@@ -2,7 +2,7 @@
 // i18n (ÇEVİRİ VE DİL MOTORU) - JSON FETCH
 // ==========================================
 let i18n = {}; // JSON'dan dolacak boş obje
-let currentLang = localStorage.getItem('blockmania_lang') || 'tr';
+let currentLang = localStorage.getItem('blockmania_lang') || 'en';
 let isDictLoaded = false;
 
 // 1. JSON dosyasını asenkron olarak çek
@@ -51,6 +51,15 @@ window.toggleLanguage = function() {
     // 3. Hafızaya kaydet ve çevirileri ekrana bas
     localStorage.setItem('blockmania_lang', currentLang);
     applyTranslations();
+    // DİL DEĞİŞİMİNDE BLOKLAR MENÜSÜNÜ SIFIRLA
+    // Böylece menü bir dahaki açılışında yeni seçilen dile göre taze açıklamalarla oluşturulur.
+    const specCont = document.getElementById('blocks-special-container');
+    const shapesCont = document.getElementById('blocks-shapes-container');
+    const jokersCont = document.getElementById('blocks-jokers-container');
+    
+    if (specCont) specCont.innerHTML = '';
+    if (shapesCont) shapesCont.innerHTML = '';
+    if (jokersCont) jokersCont.innerHTML = '';
     
     // 4. Ayarlar menüsündeki dil butonunun yazısını güncelle
     updateLangButtonUI();
@@ -85,6 +94,87 @@ let userSettings = JSON.parse(localStorage.getItem('blockmania_settings')) || {
 };
 
 window.userSettings = userSettings;
+
+// --- KESE (POUCH) YARDIMCI FONKSİYONLARI VE ANİMASYONLARI ---
+window.getBundleStats = function(currentScore) {
+    if (currentScore < 20000) return { level: 1, cap: 8000 };
+    if (currentScore < 100000) return { level: 2, cap: 15000 };
+    if (currentScore < 250000) return { level: 3, cap: 25000 };
+    return { level: 4, cap: 75000 };
+};
+
+// Puanların ana skordan ziyade keseye uçmasını sağlayan sistem
+window.flyPointsToPouch = function(pts, targetEl) {
+    const f = document.createElement('div');
+    f.className = 'floating-score collecting';
+    f.innerText = `+${pts}`;
+    f.style.color = '#f1c40f'; // Kese sarısı
+    f.style.textShadow = '0 4px 10px rgba(241, 196, 15, 0.8)';
+    f.style.fontSize = `${Math.min(1.2 + (pts / 500), 2.5)}rem`;
+    f.style.position = 'absolute';
+    f.style.zIndex = '10000';
+    
+    const mainScore = document.getElementById('score');
+    const rect = mainScore.getBoundingClientRect();
+    f.style.left = `${rect.right + window.scrollX + 7}px`; 
+    f.style.top = `${rect.top + window.scrollY}px`; 
+    document.body.appendChild(f);
+    
+    setTimeout(() => {
+        f.classList.remove('collecting');
+        f.classList.add('flying');
+        f.style.transition = 'transform 0.4s ease-in, opacity 0.4s ease-in';
+        const tRect = targetEl.getBoundingClientRect();
+        const distX = tRect.left + (tRect.width/2) - (rect.right + 7);
+        const distY = tRect.top + (tRect.height/2) - rect.top;
+        f.style.transform = `translate(${distX}px, ${distY}px) scale(0.3)`;
+        f.style.opacity = '0';
+        setTimeout(() => {
+            if (f.parentNode) f.remove();
+            targetEl.classList.add('chest-pop-anim');
+            setTimeout(() => targetEl.classList.remove('chest-pop-anim'), 300);
+        }, 400);
+    }, 300);
+};
+
+// Keseyi patlatınca içinden çıkan devasa sarı puanların skora uçması
+window.tallyBundlePoints = function(pts, sourceEl) {
+    const f = document.createElement('div');
+    f.className = 'floating-score collecting';
+    f.innerText = `+${pts}`;
+    f.style.color = '#f1c40f'; 
+    f.style.textShadow = '0 4px 15px rgba(241, 196, 15, 0.6)';
+    f.style.fontSize = `${Math.min(2 + (pts / 5000), 4.5)}rem`;
+    f.style.position = 'absolute';
+    f.style.zIndex = '10000';
+    const sRect = sourceEl.getBoundingClientRect();
+    f.style.left = `${sRect.left + window.scrollX}px`;
+    f.style.top = `${sRect.top - 20 + window.scrollY}px`;
+    document.body.appendChild(f);
+    f.style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s';
+    
+    setTimeout(() => {
+        f.style.transform = 'translateY(-60px) scale(1.3)'; // Önce havalanır
+        setTimeout(() => {
+            const targetRect = document.getElementById('score').getBoundingClientRect();
+            const distX = targetRect.left + targetRect.width/2 - sRect.left;
+            const distY = targetRect.top + targetRect.height/2 - (sRect.top - 80);
+            f.style.transition = 'transform 0.5s ease-in, opacity 0.5s ease-in';
+            f.style.transform = `translate(${distX}px, ${distY}px) scale(0.3)`;
+            f.style.opacity = '0';
+            setTimeout(() => {
+                if (f.parentNode) f.remove();
+                score += pts;
+                document.getElementById('score').innerText = formatScore(score);
+                let s = document.getElementById('score');
+                s.style.color = '#f1c40f';
+                s.style.transform = 'scale(1.5)';
+                if(typeof SFX !== 'undefined' && SFX.chestOpen) SFX.chestOpen();
+                setTimeout(() => { s.style.transform = 'scale(1)'; s.style.color = ''; }, 300);
+            }, 500);
+        }, 700);
+    }, 50);
+};
 
 const boardSize = 9;
 let boardState = [];
@@ -618,6 +708,36 @@ window.onload = () => {
 document.addEventListener('pointerdown', (e) => {
     if (!isGameRunning || isGameOverSequence)
         return;
+
+
+
+let clickedSlot = e.target.closest('.joker-slot');
+    let bundleCanceled = false;
+
+    if (typeof playerJokers !== 'undefined') {
+        playerJokers.forEach((j, index) => {
+            if (j.type === 'bundle' && j.readyToCash) {
+                // Only cancel if clicking OUTSIDE any joker slot
+                if (!clickedSlot || clickedSlot.id !== `jk-${index}`) {
+                    
+                    j.readyToCash = false;
+                    bundleCanceled = true;
+                }
+            }
+        });
+    }
+
+    if (bundleCanceled) {
+        if (typeof window.hideSmartTooltip === 'function') window.hideSmartTooltip();
+        
+        setTimeout(() => {
+            if (typeof updateJokerUI === 'function') updateJokerUI();
+        }, 10);
+        
+        // IMPORTANT: Exit early to prevent further processing
+        return;
+    }
+    // ----------------------------------
     let cell = e.target.closest('.cell') || e.target.closest('.piece-cell');
     let jokerSlot = e.target.closest('.joker-slot');
 // OYUN İÇİ AKILLI TOOLTIP TETİKLEYİCİ
@@ -665,12 +785,29 @@ document.addEventListener('pointerup', (e) => {
             const {r, c} = dragInfo.currentOrigin;
             if (canPlace(boardState, dragInfo.shape, r, c)) {
                 saveHistory();
+                
+                // YENİ: Parça sayısını say ve yerleştirme puanını hesapla
+                let blockCount = 0;
+                for (let i = 0; i < dragInfo.shape.length; i++) {
+                    for (let j = 0; j < dragInfo.shape[0].length; j++) {
+                        if (dragInfo.shape[i][j] === 1) blockCount++;
+                    }
+                }
+                
+                // Puan = Parça Sayısı * Blok Başı Skor * Combo Çarpanı
+                let placementPoints = blockCount * gameState.baseBlockScore * combo;
+                if (activeMultiplier.active && activeMultiplier.turns > 0) {
+                    placementPoints *= 5; // Varsa aktif x5 çarpanı
+                }
+
                 placePiece(dragInfo.shape, r, c, dragInfo.color, dragInfo.hasSpecial, dragInfo.specialType, dragInfo.specialPos, dragInfo.hasKey, dragInfo.keyPos);
                 currentPiecesData[dragInfo.index].used = true;
                 placed = true;
                 turnClearedBlocks = 0;
                 turnPoints = 0;
-                checkBoardLogic();
+                
+                // Yerleştirme puanını tahta kontrolüne gönder
+                checkBoardLogic(false, placementPoints);
                 updateTrayPiecesState();
                 if (currentPiecesData.every(p => p.used)) {
                     setTimeout( () => {
@@ -696,8 +833,9 @@ document.addEventListener('pointerup', (e) => {
     if (pendingJokerDrag) {
         let idx = pendingJokerDrag.index;
         pendingJokerDrag = null;
-        if (!jokerPressIsLong && !jokerDragInfo) {
-            activateJoker(idx);
+	        if (!jokerPressIsLong && !jokerDragInfo) {
+			
+	                activateJoker(idx);
         }
     }
     if (jokerDragInfo) {
@@ -1642,7 +1780,7 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
             }
         } else if (type === 'scoreUp') {
  	    if(typeof SFX!=='undefined') SFX.scoreUp();
-            if (gameState.baseBlockScore < 35) {
+            if (gameState.baseBlockScore < 50) {
                 gameState.baseBlockScore++;
                 updateBaseScoreUI(true);
                 if (gameState.baseBlockScore > stats.maxBaseScore)
@@ -1665,10 +1803,28 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
                 pct = Math.min(20, 5 + (age * 1));
             }
             let penalty = Math.floor(score * (pct / 100));
-            scoreMod = -penalty;
+            
+            // YENİ: Cezayı havuzdan değil, DOĞRUDAN ana skordan düşüyoruz!
+            score -= penalty;
+            score = Math.max(0, score);
+            document.getElementById('score').innerText = formatScore(score);
+            
+            // Skorda kırmızı bir sarsıntı efekti yaratalım
+            let s = document.getElementById('score');
+            s.style.color = '#e74c3c';
+            s.style.transform = 'scale(1.3)';
+            setTimeout(() => { s.style.transform = 'scale(1)'; s.style.color = ''; }, 300);
+
             if (penalty > stats.maxPenalty)
                 stats.maxPenalty = penalty;
             showPraise(`-${penalty} PUAN!`, "#c0392b");
+
+            // KRİTİK: Geri Al (Undo) jokerinin bu cezayı da geri verebilmesi için geçmişe işliyoruz
+            if (historyState) {
+                historyState.earnedPoints = (historyState.earnedPoints || 0) - penalty;
+            }
+
+            scoreMod = 0; // Kazanç havuzunu (earnedPoints) eksiltmemesi için 0 döndürüyoruz!
         }
     } else {
         if (['scoreDown', 'skull', 'cursedKey', 'minus'].includes(type))
@@ -1686,6 +1842,9 @@ function executeAreaChains(areas, chainCombo) {
         }
         let area = areas.shift();
         let targets = [];
+        
+        // YENİ: Seçilen yönün ikonunu hafızada tutmak için değişken
+        let displayType = area.type;
 
         if (area.type === 'row') {
             for (let c = 0; c < 9; c++) if (c !== area.c) targets.push({ r: area.r, c: c });
@@ -1695,22 +1854,23 @@ function executeAreaChains(areas, chainCombo) {
             for (let c = 0; c < 9; c++) if (c !== area.c) targets.push({ r: area.r, c: c });
             for (let r = 0; r < 9; r++) if (r !== area.r) targets.push({ r: r, c: area.c });
         } else if (area.type === '?') {
-            // YENİ: Akıllı Rastgele Bloğu (Önce doluları, sonra boşları hedefler)
-            let filledCells = [];
-            let emptyCells = [];
-            for (let i = 0; i < 9; i++) {
-                for (let j = 0; j < 9; j++) {
-                    if (i !== area.r || j !== area.c) {
-                        if (boardState[i][j] !== 0) filledCells.push({ r: i, c: j });
-                        else emptyCells.push({ r: i, c: j });
-                    }
+            // YENİ: %33 ihtimalle Yatay (row), Dikey (col) veya Çapraz (X) patlatma
+            let roll = Math.random();
+            if (roll < 0.333) {
+                displayType = 'row';
+                for (let c = 0; c < 9; c++) if (c !== area.c) targets.push({ r: area.r, c: c });
+            } else if (roll < 0.666) {
+                displayType = 'col';
+                for (let r = 0; r < 9; r++) if (r !== area.r) targets.push({ r: r, c: area.c });
+            } else {
+                displayType = 'X';
+                for (let i = -8; i <= 8; i++) {
+                    if (i === 0) continue;
+                    if (area.r + i >= 0 && area.r + i < 9 && area.c + i >= 0 && area.c + i < 9)
+                        targets.push({ r: area.r + i, c: area.c + i });
+                    if (area.r + i >= 0 && area.r + i < 9 && area.c - i >= 0 && area.c - i < 9)
+                        targets.push({ r: area.r + i, c: area.c - i });
                 }
-            }
-            filledCells.sort(() => 0.5 - Math.random());
-            emptyCells.sort(() => 0.5 - Math.random());
-            targets = filledCells.slice(0, 9);
-            if (targets.length < 9) {
-                targets = targets.concat(emptyCells.slice(0, 9 - targets.length));
             }
         } else if (area.type === 'X') {
             // YENİ: Çapraz Alan Bloğu
@@ -1733,7 +1893,8 @@ function executeAreaChains(areas, chainCombo) {
         combo++;
         updateComboUI();
         fireAgroMultiplier(Math.min(combo, 10));
-	if(typeof SFX!=='undefined') SFX.areaBlock();
+        if(typeof SFX!=='undefined') SFX.areaBlock(); // SFX KORUNDU
+        
         let earnedPoints = 0;
         let newAreas = [];
         const originCell = boardEl.children[area.r * 9 + area.c];
@@ -1742,70 +1903,108 @@ function executeAreaChains(areas, chainCombo) {
         targets.sort((a, b) => (Math.abs(a.r - area.r) + Math.abs(a.c - area.c)) - (Math.abs(b.r - area.r) + Math.abs(b.c - area.c)));
         let maxDist = 0;
 
-        targets.forEach(t => {
-            let dist = Math.abs(t.r - area.r) + Math.abs(t.c - area.c);
-            if (area.type === '?') dist = Math.floor(Math.random() * 5);
-            maxDist = Math.max(maxDist, dist);
+        // ----------------------------------------------------
+        // YENİ: DÖNÜŞÜM ANİMASYONU VE BEKLETME MOTORU
+        // ----------------------------------------------------
+        let blastDelay = 0; 
+
+        if (area.type === '?') {
+            blastDelay = 650; 
+            
+            if (originCell) {
+                boardState[area.r][area.c] = displayType; 
+                
+                let oldImg = originCell.querySelector('img');
+                if (oldImg) {
+                    oldImg.style.transition = 'transform 0.2s ease-in, opacity 0.2s ease-in';
+                    oldImg.style.transform = 'scale(0) rotate(180deg)';
+                    oldImg.style.opacity = '0';
+                }
+
+                setTimeout(() => {
+                    originCell.innerHTML = getIconHTML(displayType, area.r, area.c);
+                    let newImg = originCell.querySelector('img');
+                    if (newImg) {
+                        newImg.style.opacity = '0';
+                        newImg.style.transform = 'scale(0) rotate(-180deg)';
+                        newImg.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-out';
+                        void newImg.offsetWidth;
+                        newImg.style.opacity = '1';
+                        newImg.style.transform = 'scale(1) rotate(0deg) translateX(-18px) translateY(-18px)';
+                    }
+                }, 100);
+            }
+        }
+
+        // ----------------------------------------------------
+        // ASIL PATLATMA ZİNCİRİ
+        // ----------------------------------------------------
+        setTimeout(() => {
+            targets.forEach(t => {
+                let dist = Math.abs(t.r - area.r) + Math.abs(t.c - area.c);
+                maxDist = Math.max(maxDist, dist);
+
+                setTimeout(() => {
+                    let type = boardState[t.r][t.c];
+                    let cell = boardEl.children[t.r * 9 + t.c];
+
+                    cell.classList.add('cell-wave-shake');
+                    let flash = document.createElement('div');
+                    flash.className = 'cell-flash';
+                    cell.appendChild(flash);
+
+                    setTimeout(() => {
+                        if (flash.parentNode) flash.remove();
+                        cell.classList.remove('cell-wave-shake');
+                    }, 500);
+
+                    if (type === 0) return;
+
+                    if (['+', 'row', 'col', '?', 'X', 'M'].includes(type)) {
+                        let exists = areas.some(a => a.r === t.r && a.c === t.c) || newAreas.some(a => a.r === t.r && a.c === t.c);
+                        if (!exists) newAreas.push({ r: t.r, c: t.c, type });
+                    } else {
+                        // KRİTİK DEĞİŞİKLİK: 'false' gönderimi KORUNDU!
+                        let pMod = triggerSpecials(type, cell, t.r, t.c, false);
+                        boardState[t.r][t.c] = 0;
+                        turnClearedBlocks++;
+                        rawScore++;
+                        delete specialBlockStates[`${t.r},${t.c}`];
+                        cell.innerHTML = '';
+                        cell.classList.remove('cursed-cell', 'show-tooltip', 'levitate-anim');
+                        cell.classList.add('clearing');
+                        setTimeout(() => {
+                            cell.className = `cell ${(Math.floor(t.r / 3) + Math.floor(t.c / 3)) % 2 === 1 ? 'nth-region' : ''}`;
+                            cell.style.backgroundColor = '';
+                        }, 500);
+                        earnedPoints += (gameState.baseBlockScore * combo) + pMod;
+                    }
+                }, dist * 80);
+            });
 
             setTimeout(() => {
-                let type = boardState[t.r][t.c];
-                let cell = boardEl.children[t.r * 9 + t.c];
-
-                cell.classList.add('cell-wave-shake');
-                let flash = document.createElement('div');
-                flash.className = 'cell-flash';
-                cell.appendChild(flash);
-
-                setTimeout(() => {
-                    if (flash.parentNode) flash.remove();
-                    cell.classList.remove('cell-wave-shake');
-                }, 500);
-
-                if (type === 0) return;
-
-                // X ve M bloklarını tanıma sistemine dahil ettik
-                if (['+', 'row', 'col', '?', 'X', 'M'].includes(type)) {
-                    let exists = areas.some(a => a.r === t.r && a.c === t.c) || newAreas.some(a => a.r === t.r && a.c === t.c);
-                    if (!exists) newAreas.push({ r: t.r, c: t.c, type });
-                } else {
-                    // KRİTİK DEĞİŞİKLİK: Burada 'false' göndererek alan bloklarının lanetleri ve özel blokları doğrudan TETİKLEMESİNİ sağladık!
-                    let pMod = triggerSpecials(type, cell, t.r, t.c, false);
-                    boardState[t.r][t.c] = 0;
-                    turnClearedBlocks++;
-                    rawScore++;
-                    delete specialBlockStates[`${t.r},${t.c}`];
-                    cell.innerHTML = '';
-                    cell.classList.remove('cursed-cell', 'show-tooltip', 'levitate-anim');
-                    cell.classList.add('clearing');
+                if (originCell) {
+                    boardState[area.r][area.c] = 0;
+                    delete specialBlockStates[`${area.r},${area.c}`];
+                    originCell.classList.remove('cursed-cell', 'show-tooltip', 'levitate-anim');
+                    originCell.classList.add('area-block-clear');
                     setTimeout(() => {
-                        cell.className = `cell ${(Math.floor(t.r / 3) + Math.floor(t.c / 3)) % 2 === 1 ? 'nth-region' : ''}`;
-                        cell.style.backgroundColor = '';
-                    }, 500);
-                    earnedPoints += (gameState.baseBlockScore * combo) + pMod;
+                        originCell.innerHTML = '';
+                        originCell.className = `cell ${(Math.floor(area.r / 3) + Math.floor(area.c / 3)) % 2 === 1 ? 'nth-region' : ''}`;
+                        originCell.style.backgroundColor = '';
+                        originCell.classList.remove('area-block-clear');
+                    }, 600);
                 }
-            }, dist * 80);
-        });
-
-        setTimeout(() => {
-            if (originCell) {
-                boardState[area.r][area.c] = 0;
-                delete specialBlockStates[`${area.r},${area.c}`];
-                originCell.classList.remove('cursed-cell', 'show-tooltip', 'levitate-anim');
-                originCell.classList.add('area-block-clear');
-                setTimeout(() => {
-                    originCell.innerHTML = '';
-                    originCell.className = `cell ${(Math.floor(area.r / 3) + Math.floor(area.c / 3)) % 2 === 1 ? 'nth-region' : ''}`;
-                    originCell.style.backgroundColor = '';
-                    originCell.classList.remove('area-block-clear');
-                }, 600);
-            }
-            if (earnedPoints !== 0) {
-                if (earnedPoints > 0 && activeMultiplier.active && activeMultiplier.turns > 0) earnedPoints *= 5;
-                tallyPoints(earnedPoints);
-            }
-            areas.push(...newAreas);
-            setTimeout(() => executeAreaChains(areas, chainCombo + 1), 200);
-        }, maxDist * 80 + 350);
+                if (earnedPoints !== 0) {
+                    if (earnedPoints > 0 && activeMultiplier.active && activeMultiplier.turns > 0) earnedPoints *= 5;
+                    tallyPoints(earnedPoints);
+                }
+                areas.push(...newAreas);
+                setTimeout(() => executeAreaChains(areas, chainCombo + 1), 200);
+            }, maxDist * 80 + 350);
+            
+        }, blastDelay); 
+        
     } catch (err) {
         console.error("Engine Fallback:", err);
         activeAnimations--;
@@ -1813,48 +2012,50 @@ function executeAreaChains(areas, chainCombo) {
     }
 }
 
-function checkBoardLogic(isFreeTurn=false) {
+// YENİ: Fonksiyon artık yerleştirme puanını da kabul ediyor
+function checkBoardLogic(isFreeTurn=false, placementPoints=0) {
     let toClear = new Set();
-    let rowsCleared = 0
-      , colsCleared = 0
-      , boxesCleared = 0;
+    let rowsCleared = 0, colsCleared = 0, boxesCleared = 0;
+    
     for (let r = 0; r < 9; r++)
         if (boardState[r].every(v => v !== 0)) {
             rowsCleared++;
-            for (let c = 0; c < 9; c++)
-                toClear.add(`${r},${c}`);
+            for (let c = 0; c < 9; c++) toClear.add(`${r},${c}`);
         }
     for (let c = 0; c < 9; c++)
         if (boardState.every(row => row[c] !== 0)) {
             colsCleared++;
-            for (let r = 0; r < 9; r++)
-                toClear.add(`${r},${c}`);
+            for (let r = 0; r < 9; r++) toClear.add(`${r},${c}`);
         }
     for (let br = 0; br < 3; br++)
         for (let bc = 0; bc < 3; bc++) {
             let filled = true;
             for (let i = 0; i < 3; i++)
                 for (let j = 0; j < 3; j++)
-                    if (boardState[br * 3 + i][bc * 3 + j] === 0)
-                        filled = false;
-            if (filled) {
-                boxesCleared++;
+                    if (boardState[br * 3 + i][bc * 3 + j] === 0) filled = false;
+            if (filled)
                 for (let i = 0; i < 3; i++)
                     for (let j = 0; j < 3; j++)
                         toClear.add(`${br * 3 + i},${bc * 3 + j}`);
-            }
         }
+
     let triggeredAreas = [];
+    let earnedPoints = placementPoints; // Puanı yerleştirme puanıyla başlatıyoruz
+
     if (toClear.size > 0) {
         combo++;
         let mult = calculateMultiplier(rowsCleared, colsCleared, boxesCleared);
-        let earnedPoints = toClear.size * gameState.baseBlockScore * mult * combo;
+        let clearPts = toClear.size * gameState.baseBlockScore * mult * combo;
+        
         if (activeMultiplier.active && activeMultiplier.turns > 0) {
-            earnedPoints *= 5;
-            if (!isFreeTurn)
-                activeMultiplier.turns--;
+            clearPts *= 5;
+            if (!isFreeTurn) activeMultiplier.turns--;
             updateMultUI();
         }
+        
+        earnedPoints += clearPts; // Yerleştirme + Patlatma puanı toplamı
+        
+   
         if (mult > 1)
             fireAgroMultiplier(mult);
         Array.from(toClear).forEach( (coord) => {
@@ -1889,7 +2090,7 @@ function checkBoardLogic(isFreeTurn=false) {
         }
         );
         if (historyState)
-            historyState.earnedPoints = earnedPoints;
+            historyState.earnedPoints = (historyState.earnedPoints || 0) + earnedPoints;
         updateComboUI();
         tallyPoints(earnedPoints);
         if (triggeredAreas.length > 0) {
@@ -1917,7 +2118,11 @@ function checkBoardLogic(isFreeTurn=false) {
                     updateComboUI();
             }
             if (historyState)
-                historyState.earnedPoints = 0;
+                historyState.earnedPoints = (historyState.earnedPoints || 0) + placementPoints;
+                
+            if (placementPoints > 0) {
+                tallyPoints(placementPoints);
+            }
         }
     }
     if (!isFreeTurn) {
@@ -2041,6 +2246,38 @@ if (!playableLifeline)
 
 function triggerGameOverSequence() {
     isGameOverSequence = true;
+    if (typeof playerJokers !== 'undefined') {
+        let bundlePointsAdded = false;
+
+        playerJokers.forEach(j => {
+            if (j.type === 'bundle' && j.amount > 0) {
+                // 1. Temel Kombo Çarpanı
+                let finalPts = j.amount * combo;
+                
+                // 2. Aktif x5 Çarpanı Kontrolü
+                if (typeof activeMultiplier !== 'undefined' && activeMultiplier.active && activeMultiplier.turns > 0) {
+                    finalPts *= 5;
+                }
+                
+                // Skora Ekle
+                score += finalPts; 
+                bundlePointsAdded = true;
+            }
+        });
+
+        // Keseleri temizle ve arayüzü güncelle
+        playerJokers = playerJokers.filter(j => j.type !== 'bundle');
+        if (typeof updateJokerUI === 'function') updateJokerUI();
+
+        // 3. KRİTİK: Eğer keseden puan eklendiyse ana skoru HEMEN ekranda güncelle
+        // Böylece oyun sonu paneli açıldığında doğru ve en yüksek skoru çeker!
+        if (bundlePointsAdded) {
+            const scoreUI = document.getElementById('score');
+            if (scoreUI) {
+                scoreUI.innerText = formatScore(score);
+            }
+        }
+    }
     isGameRunning = false;
     document.getElementById('mult-info').style.opacity = '0';
     saveCurrentToHighScores();
@@ -2213,13 +2450,84 @@ function showPraise(text, color) {
 
 function tallyPoints(pts) {
     turnPoints += pts;
+    // --- YENİ: KESE YÖNLENDİRME SİSTEMİ ---
+    if (pts > 0 && playerJokers && playerJokers.some(j => j.type === 'bundle')) {
+        let bundleIdx = -1;
+        for (let i = 0; i < playerJokers.length; i++) {
+            if (playerJokers[i].type === 'bundle') {
+                if (playerJokers[i].amount === undefined) playerJokers[i].amount = 0;
+                let bStats = getBundleStats(score);
+                if (playerJokers[i].amount < bStats.cap) {
+                    bundleIdx = i; break;
+                }
+            }
+        }
+        if (bundleIdx > -1) {
+            let bStats = getBundleStats(score);
+            let room = bStats.cap - playerJokers[bundleIdx].amount;
+            let fit = Math.min(pts, room); // Sığacak olanı al
+            
+            playerJokers[bundleIdx].amount += fit;
+            updateJokerUI(); // Barı anında doldur
+            
+            pts -= fit; // Kalanı skora gönder (eğer varsa)
+            flyPointsToPouch(fit, document.getElementById(`jk-${bundleIdx}`));
+            
+            if (pts === 0) return; // Tüm puan keseye sığdıysa burayı terk et!
+        }
+    }
+    // --- KESE YÖNLENDİRME SONU ---
     const f = document.getElementById('floating-score');
+
+    const mainScore = document.getElementById('score'); // Asıl skor metni/ikonu
+    if (f && mainScore) {
+        // 1. HAYAT KURTARAN DOKUNUŞ: Elementi kapsayıcı hapsinden çıkarıp direkt body'ye alıyoruz.
+        // Böylece ekranın neresi olduğunu şaşırmayacak.
+        if (f.parentNode !== document.body) {
+            document.body.appendChild(f);
+        }
+
+        // 2. Asıl skorun ekrandaki kesin yerini al
+        const rect = mainScore.getBoundingClientRect();
+        
+        // 3. Sayfa kaydırma (scroll) payını da ekleyerek tam koordinatı ver
+        f.style.position = 'absolute';
+        f.style.margin = '0'; // Eski CSS'ten kalan marginleri sıfırla
+        f.style.left = `${rect.right + window.scrollX + 7}px`; 
+        f.style.top = `${rect.top}px`; 
+    } 
+
     f.innerText = pts > 0 ? `+${pts}` : pts;
     f.style.color = pts < 0 ? '#e74c3c' : '#27ae60';
     f.style.textShadow = pts < 0 ? '0 4px 10px rgba(231, 76, 60, 0.4)' : '0 4px 10px rgba(46, 204, 113, 0.4)';
-    f.style.fontSize = `${Math.min(1.5 + (Math.abs(pts) / 500), 4)}rem`;
+    f.style.fontSize = `${Math.min(1.2 + (Math.abs(pts) / 500), 3.5)}rem`;
+
+    // ----------------------------------------------------
+    // YENİ: PUANA GÖRE DİNAMİK HIZ HESAPLAMASI
+    // ----------------------------------------------------
+    let absPts = Math.abs(pts);
+    let collectTime = 900; // Varsayılan Ekranda Kalma Süresi (Büyük puanlar için)
+    let flyTime = 400;     // Varsayılan Skora Uçma Süresi
+    let animSpeed = "0.7s"; // Varsayılan CSS Büyüme Hızı
+
+    if (absPts < 100) {
+        // ÇOK KÜÇÜK PUANLAR (Sadece Blok Koyma vb.): Çok Hızlı
+        collectTime = 250; 
+        flyTime = 250;
+        animSpeed = "0.4s";
+    } else if (absPts < 500) {
+        // ORTA HALLİ PUANLAR (1-2 Satır Kırma): Standart Hız
+        collectTime = 500;
+        flyTime = 350;
+        animSpeed = "0.6s";
+    }
+    
+    // CSS'teki transition süresini JS ile anlık olarak eziyoruz
+    f.style.transition = `transform ${animSpeed} cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity ${parseFloat(animSpeed)/2}s`;
+
     f.classList.remove('flying');
     f.classList.add('collecting');
+
     if (pts >= 1000 && pts < 10000) {
         if (pts < 3000) {
             showPraise(["GÜZEL!", "SÜPER!", "BÖYLE DEVAM ET!"][Math.floor(Math.random() * 3)], "#2ecc71");
@@ -2233,9 +2541,16 @@ function tallyPoints(pts) {
             showPraise("ULTİMATE!!", "#e74c3c");
         }
     }
+
+    // Bekleme Süresi (collectTime) dolunca skora doğru uçur
     setTimeout( () => {
         f.classList.remove('collecting');
         f.classList.add('flying');
+        
+        // Uçuş hızını da dinamik olarak CSS'e ver
+        f.style.transition = `transform ${(flyTime/1000).toFixed(2)}s ease-in, opacity ${(flyTime/1000).toFixed(2)}s ease-in`;
+
+        // Uçuş Süresi (flyTime) dolunca ana skora ekle
         setTimeout( () => {
             score += pts;
             score = Math.max(0, score);
@@ -2243,10 +2558,9 @@ function tallyPoints(pts) {
             let s = document.getElementById('score');
             s.style.transform = 'scale(1.3)';
             setTimeout( () => s.style.transform = 'scale(1)', 200);
-        }
-        , 400);
-    }
-    , 900);
+        }, flyTime);
+        
+    }, collectTime);
 }
 
 function updateChestUI() {
@@ -2296,20 +2610,38 @@ function openMegaChest() {
     stats.megaChestsOpened++;
     if(typeof SFX!=='undefined') SFX.chestOpen();
     updateChestUI();
-    	let guaranteedJoker = {
+
+    // 1. DİNAMİK PUAN HESAPLAMASI (Sandık seviyesindeki en yüksek puan)
+    const CHEST_TIERS = [250, 500, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000];
+    let shift = Math.floor(gameState.chestOddsLevel / 3);
+    shift = Math.min(shift, CHEST_TIERS.length - 4);
+    let maxPts = CHEST_TIERS[shift + 3]; // Havuzdaki 4. (en büyük) ihtimali alır
+
+    // 2. KESE KONTROLLÜ JOKER SEÇİMİ
+    let availableJokers = ['hammer', 'shuffle', 'undo', '1x1'];
+    
+    // Oyuncunun elinde zaten kese YOKSA, mega sandık joker havuzuna keseyi ekle
+    if (!playerJokers.some(j => j.type === 'bundle')) {
+        availableJokers.push('bundle');
+    }
+
+    let guaranteedJoker = {
         type: 'joker',
-        val: ['hammer', 'shuffle', 'undo', '1x1'][Math.floor(Math.random() * 4)]
+        val: availableJokers[Math.floor(Math.random() * availableJokers.length)]
     };
-    if (playerJokers.length >= 3)
+
+    // Eğer oyuncunun 3 joker slotu da doluysa jokeri puana (yine en yüksek puana) çevir
+    if (playerJokers.length >= 3) {
         guaranteedJoker = {
             type: 'pts',
-            val: 1000
+            val: maxPts 
         };
+    }
 
-    // Klasik ganimetleri fırlat
+    // 3. KLASİK GANİMETLERİ FIRLAT (1000 yerine maxPts kullanıyoruz)
     [{
         type: 'pts',
-        val: 1000
+        val: maxPts
     }, {
         type: 'mult',
         val: 5
@@ -2320,7 +2652,6 @@ function openMegaChest() {
         transformRandomBlockToSpecial();
     }, 1800);
 }
-
 // YENİ FONKSİYON: Mega Sandıktan uçup haritadaki bir bloğu dönüştüren sihir
 function transformRandomBlockToSpecial() {
     let validTargets = [];
@@ -2572,6 +2903,10 @@ function updateJokerUI() {
             let t = playerJokers[i].type;
             let path = `icons/${t}.png`;
             let fallback = '';
+            
+            // 1. DÜZELTME: Değişkeni bloğun en başında BOŞ olarak tanımlıyoruz ki hata vermesin
+            let tooltipHtml = '';
+
             if (t === 'hammer')
                 fallback = '🔨';
             else if (t === 'shuffle')
@@ -2582,15 +2917,42 @@ function updateJokerUI() {
                 fallback = '🟩';
                 slot.innerHTML += `<div class="joker-badge">${playerJokers[i].count}</div>`;
             }
-            let tooltipHtml = `<div class="special-tooltip">${getJokerTooltipDesc(t)}</div>`;
-            slot.innerHTML += `<img src="${path}" class="custom-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><div style="display:none; font-size:1.5rem;">${fallback}</div>${tooltipHtml}`;
-            if (t === 'undo' || t === 'shuffle') {
-                slot.onclick = () => {
-                    if (!jokerPressIsLong)
-                        activateJoker(i);
+            else if (t === 'bundle') {
+                if (playerJokers[i].amount === undefined) playerJokers[i].amount = 0;
+                let bStats = getBundleStats(score);
+                path = `icons/bundle${bStats.level}.png`;
+                fallback = '💰';
+                
+                let amtFmt = formatScore(playerJokers[i].amount);
+                let capFmt = formatScore(bStats.cap);
+                let pct = Math.min(100, (playerJokers[i].amount / bStats.cap) * 100);
+                
+                let tipText = "";
+                if (playerJokers[i].readyToCash) {
+                    // İkinci tıklamaya hazır hali
+                    tipText = `<span style="color:#f1c40f; font-size:1.4em; font-weight:bold;">${amtFmt}</span><br><span style="font-size:0.85em; color:#fff;">${typeof t === 'function' ? t('bundle_cash_prompt') : 'Skora eklemek için bas'}</span>`;
+                } else {
+                    // Normal bilgi hali
+                    tipText = `${getJokerTooltipDesc(t)}<br><span style="color:#f1c40f; font-size:1.1em; font-weight:bold; display:block; margin-top:5px;">${amtFmt} / ${capFmt}</span>`;
                 }
-                ;
+                
+                // KESE İÇİN ÖZEL AÇIKLAMAYI ATIYORUZ
+                tooltipHtml = `<div class="special-tooltip">${tipText}</div>`;
+                
+                // ProgressBar HTML'ini yuvanın içine gömüyoruz
+                slot.innerHTML += `
+                    <div style="position:absolute; bottom:2px; left:10%; width:80%; height:5px; background:rgba(0,0,0,0.6); border-radius:3px; pointer-events:none; z-index:5;">
+                        <div style="width:${pct}%; height:100%; background:#f1c40f; border-radius:3px; transition:width 0.3s;"></div>
+                    </div>`;
             }
+            
+            // 2. DÜZELTME: Eğer üstte kese için atama yapılmadıysa (değişken hala boşsa) standart açıklamayı çek
+            if (tooltipHtml === '') {
+                tooltipHtml = `<div class="special-tooltip">${getJokerTooltipDesc(t)}</div>`;
+            }
+
+            slot.innerHTML += `<img src="${path}" class="custom-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><div style="display:none; font-size:1.5rem;">${fallback}</div>${tooltipHtml}`;
+            
         }
     }
 }
@@ -2646,6 +3008,54 @@ function activateJoker(idx) {
         checkGameOver();
     } else if (j.type === 'shuffle') {
         generatePieces(true);
+        playerJokers.splice(idx, 1);
+        updateJokerUI();
+        saveGameState();
+        checkGameOver();
+    }else if (j.type === 'bundle') {
+	
+        if (j.amount === undefined || j.amount === 0) {
+            
+            return;
+        }
+        
+        if (!j.readyToCash) {
+            // İlk Dokunuş: Bozdurma moduna geç ve UI'ı güncelle
+	              
+            j.readyToCash = true;
+            // Diğer keselerin hazır modunu iptal et
+            playerJokers.forEach(pj => { if(pj !== j) pj.readyToCash = false; });
+            updateJokerUI();
+            
+            // YENİ EKLENEN KISIM: Tıklar tıklamaz Pop-up'ı zorla göster!
+            let slotEl = document.getElementById(`jk-${idx}`);
+            let tooltipEl = slotEl.querySelector('.special-tooltip');
+            if (tooltipEl && typeof window.showSmartTooltip === 'function') {
+                window.showSmartTooltip(slotEl, tooltipEl.innerHTML);
+                
+                // Oyuncunun ekranını işgal etmemesi için 3 saniye sonra otomatik gizle
+                setTimeout(() => {
+                    if (typeof window.hideSmartTooltip === 'function') window.hideSmartTooltip();
+                }, 3000);
+            }
+            return;
+        }
+       
+        // İkinci Dokunuş: PATLAT VE SKORA EKLE!
+        if (typeof window.hideSmartTooltip === 'function') window.hideSmartTooltip(); // Patlatırken pop-up'ı anında gizle
+        
+        let finalPts = j.amount * combo;
+	if (activeMultiplier.active && activeMultiplier.turns > 0) {
+            finalPts *= 5;
+	}
+        let slotEl = document.getElementById(`jk-${idx}`);
+        
+        // Sarı özel animasyonu çağır
+        if (typeof tallyBundlePoints === 'function') {
+            tallyBundlePoints(finalPts, slotEl);
+        }
+        
+        // Keseyi jokerlerden sil
         playerJokers.splice(idx, 1);
         updateJokerUI();
         saveGameState();
@@ -2880,6 +3290,15 @@ window.playAgainDirectly = function() {
             cell.innerHTML = ''; 
             cell.style.backgroundColor = '';
         });
+    }
+    score = 0;
+    const scoreUI = document.getElementById('score');
+    if(scoreUI) {
+        scoreUI.innerText = '0';
+    }
+    const baseScoreUI = document.getElementById('base-score-val');
+    if(baseScoreUI) {
+        baseScoreUI.innerText = '10';
     }
 
     // Beklemeden direkt oyunu başlat!
