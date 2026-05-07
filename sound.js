@@ -153,7 +153,11 @@ function load(name) {
         resumeBg,
         stopBg,
 
-        place()      { play('place', {volume:0.9}); vibe(20); },
+        place() { 
+            const randomIndex = Math.floor(Math.random() * 5) + 1; 
+            play(`place${randomIndex}`, {volume:0.9}); 
+            vibe(20); 
+        },
 
         combo(level) {
             // level = current combo value (2, 3, 4, 5 …)
