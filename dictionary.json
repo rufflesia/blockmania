@@ -31,6 +31,11 @@
         "death_warning": "SONRAKİ TUR ÖLÜM!",
         "death_penalty": "-10K!",
 
+	"menu_blocks_title": "Bloklar & Özellikler",
+        "menu_special_blocks": "Özel Bloklar",
+        "menu_all_shapes": "Tüm Şekiller",
+        "menu_jokers": "Jokerler",
+
         "no_records": "Henüz kayıt yok.",
         "no_data": "Kayda değer veri yok.",
         "stat_points_move": "Tek Hamlede Maksimum Puan",
@@ -46,6 +51,8 @@
         "stat_curses_cleared": "Atlatılan Lanet",
 
         "desc_hammer": "Çekiç: Sürükle ve 2x2'lik alanı kır!",
+	"desc_bundle": "Kese Jokeri: Kazanılan puanları depolar. Tekrar basarak içindeki puanları o anki kombo çarpanınla skora katlayarak ekle!",
+        "bundle_cash_prompt": "Skora eklemek için bas",
         "desc_1x1": "Random Blok: Sürükle ve sürpriz bir blok koy!",
         "desc_shuffle": "Yenile: Bir setteki blokları kolayları ile değiştirir.",
         "desc_undo": "Geri Al: Yaptığın son hamleyi geri al.",
@@ -53,7 +60,7 @@
         "desc_cross": "+ Şeklinde Patlat: Satır ve sütunu patlatır.",
         "desc_row": "Satırı Patlat: Tetiklendiğinde bulunduğu satırı yok eder.",
         "desc_col": "Sütunu Patlat: Tetiklendiğinde bulunduğu sütunu yok eder.",
-        "desc_random": "Rastgele: Tetiklendiğinde rastgele 9 bloğu yok eder.",
+        "desc_random": "Sürpriz Yön: Tetiklendiğinde yatay, dikey veya çapraz patlatmalardan birini rastgele uygular.",
         "desc_life": "Kalkan: Tetiklendiğinde kombo çarpanını 7 tur boyunca korur.",
         "desc_skull": "Lanet: Ölüm turu başlatır! Hayatta kalmaya çalış!",
         "desc_megachest_describe": "5 anahtar toplanınca eşsiz ödüllerle dolu Mega Sandık açılır!",
@@ -145,6 +152,11 @@
         "death_warning": "NEXT ROUND IS DEATH!",
         "death_penalty": "-10K!",
 
+	"menu_blocks_title": "Blocks & Features",
+    	"menu_special_blocks": "Special Blocks",
+    	"menu_all_shapes": "All Shapes",
+    	"menu_jokers": "Jokers",
+
         "no_records": "No records yet.",
         "no_data": "No significant data.",
         "stat_points_move": "Max Points in a Single Move",
@@ -160,6 +172,8 @@
         "stat_curses_cleared": "Curses Cleared",
 
         "desc_hammer": "Hammer: Drag and break a 2x2 area!",
+	"desc_bundle": "Pouch Joker: Stores earned points. Tap again to add the stored points to your score multiplied by your current combo!",
+	"bundle_cash_prompt": "Tap to add to score",
         "desc_1x1": "Random Block: Drag and place a surprise block!",
         "desc_shuffle": "Shuffle: Replaces the blocks in a set with easier ones.",
         "desc_undo": "Undo: Revert your last move.",
@@ -167,7 +181,7 @@
         "desc_cross": "Cross Blast: Destroys the row and column.",
         "desc_row": "Row Blast: Destroys its row when triggered.",
         "desc_col": "Column Blast: Destroys its column when triggered.",
-        "desc_random": "Random: Destroys 9 random blocks when triggered.",
+        "desc_random": "Surprise Direction: Randomly applies horizontal, vertical, or cross blast when triggered.",
         "desc_life": "Shield: Protects your combo multiplier for 7 rounds when triggered.",
         "desc_skull": "Curse: Starts a death round! Try to survive!",
         "desc_megachest_describe": "Collecting 5 keys opens the Mega Chest filled with unique rewards!",
@@ -258,6 +272,11 @@
         "death_warning": "NÄCHSTE RUNDE IST DER TOD!",
         "death_penalty": "-10K!",
 
+	"menu_blocks_title": "Blöcke & Funktionen",
+    	"menu_special_blocks": "Spezialblöcke",
+    	"menu_all_shapes": "Alle Formen",
+    	"menu_jokers": "Joker",
+
         "no_records": "Noch keine Rekorde.",
         "no_data": "Keine signifikanten Daten.",
         "stat_points_move": "Max. Punkte in einem Zug",
@@ -273,6 +292,8 @@
         "stat_curses_cleared": "Aufgehobene Flüche",
 
         "desc_hammer": "Hammer: Ziehen und einen 2x2 Bereich zerstören!",
+	"desc_bundle": "Beutel-Joker: Speichert verdiente Punkte. Tippe erneut, um sie mit deinem aktuellen Kombo-Multiplikator zum Punktestand hinzuzufügen!",
+	"bundle_cash_prompt": "Tippen zum Einlösen",
         "desc_1x1": "Zufälliger Block: Ziehen und einen Überraschungsblock platzieren!",
         "desc_shuffle": "Mischen: Ersetzt die Blöcke in einem Set durch einfachere.",
         "desc_undo": "Rückgängig: Macht deinen letzten Zug rückgängig.",
@@ -280,7 +301,7 @@
         "desc_cross": "Kreuz-Explosion: Zerstört die Zeile und Spalte.",
         "desc_row": "Zeilen-Explosion: Zerstört die Zeile bei Auslösung.",
         "desc_col": "Spalten-Explosion: Zerstört die Spalte bei Auslösung.",
-        "desc_random": "Zufällig: Zerstört bei Auslösung 9 zufällige Blöcke.",
+        "desc_random": "Überraschungsrichtung: Löst bei Aktivierung zufällig eine horizontale, vertikale oder kreuzförmige Explosion aus.",
         "desc_life": "Schild: Schützt deinen Kombo-Multiplikator für 7 Runden.",
         "desc_skull": "Fluch: Startet eine Todesrunde! Versuch zu überleben!",
         "desc_megachest_describe": "Das Sammeln von 5 Schlüsseln öffnet die Mega-Truhe mit einzigartigen Belohnungen!",
@@ -371,6 +392,11 @@
         "death_warning": "¡LA PRÓXIMA RONDA ES LA MUERTE!",
         "death_penalty": "-10K!",
 
+	"menu_blocks_title": "Bloques y Características",
+    	"menu_special_blocks": "Bloques Especiales",
+    	"menu_all_shapes": "Todas las Formas",
+    	"menu_jokers": "Comodines",
+
         "no_records": "Sin registros aún.",
         "no_data": "Sin datos significativos.",
         "stat_points_move": "Puntos Máximos en un Movimiento",
@@ -386,6 +412,8 @@
         "stat_curses_cleared": "Maldiciones Eliminadas",
 
         "desc_hammer": "Martillo: ¡Arrastra y rompe un área de 2x2!",
+	"desc_bundle": "Comodín de Bolsa: Almacena los puntos ganados. ¡Toca de nuevo para añadir los puntos almacenados a tu puntuación multiplicados por tu combo actual!",
+	"bundle_cash_prompt": "Toca para sumar puntos",
         "desc_1x1": "Bloque Aleatorio: ¡Arrastra y coloca un bloque sorpresa!",
         "desc_shuffle": "Barajar: Reemplaza los bloques de un conjunto por otros más fáciles.",
         "desc_undo": "Deshacer: Revierte tu último movimiento.",
@@ -393,7 +421,7 @@
         "desc_cross": "Explosión en Cruz: Destruye la fila y la columna.",
         "desc_row": "Explosión de Fila: Destruye su fila al activarse.",
         "desc_col": "Explosión de Columna: Destruye su columna al activarse.",
-        "desc_random": "Aleatorio: Destruye 9 bloques aleatorios al activarse.",
+        "desc_random": "Dirección Sorpresa: Al activarse, aplica aleatoriamente una explosión horizontal, vertical o en cruz.",
         "desc_life": "Escudo: Protege tu multiplicador de combo durante 7 rondas al activarse.",
         "desc_skull": "Maldición: ¡Inicia una ronda de muerte! ¡Intenta sobrevivir!",
         "desc_megachest_describe": "¡Recolectar 5 llaves abre el Mega Cofre lleno de recompensas únicas!",
@@ -484,6 +512,11 @@
         "death_warning": "下一回合是死亡回合！",
         "death_penalty": "-10K！",
 
+	"menu_blocks_title": "方块与特性",
+    	"menu_special_blocks": "特殊方块",
+    	"menu_all_shapes": "所有形状",
+    	"menu_jokers": "百搭",
+
         "no_records": "暂无记录。",
         "no_data": "无重要数据。",
         "stat_points_move": "单步最高分",
@@ -499,6 +532,8 @@
         "stat_curses_cleared": "清除的诅咒",
 
         "desc_hammer": "锤子：拖动并破坏2x2区域！",
+	"desc_bundle": "锦囊小丑：储存获得的积分。再次点击即可将储存的积分乘以当前的连击倍数并加到总分中！",
+	"bundle_cash_prompt": "点击添加至分数",
         "desc_1x1": "随机方块：拖动并放置一个惊喜方块！",
         "desc_shuffle": "洗牌：用更简单的方块替换当前的一组方块。",
         "desc_undo": "撤销：撤销你的上一步操作。",
@@ -506,7 +541,7 @@
         "desc_cross": "十字爆破：摧毁所在的行和列。",
         "desc_row": "横向爆破：触发时摧毁其所在的行。",
         "desc_col": "纵向爆破：触发时摧毁其所在的列。",
-        "desc_random": "随机爆破：触发时随机摧毁9个方块。",
+        "desc_random": "惊喜方向：触发时随机应用水平、垂直或交叉爆炸。",
         "desc_life": "护盾：触发时在7个回合内保护你的连击倍数。",
         "desc_skull": "诅咒：开启死亡回合！努力生存下来！",
         "desc_megachest_describe": "收集5把钥匙可打开充满独特奖励的超级宝箱！",
@@ -597,6 +632,11 @@
         "death_warning": "СЛЕДУЮЩИЙ РАУНД - СМЕРТЕЛЬНЫЙ!",
         "death_penalty": "-10K!",
 
+	"menu_blocks_title": "Блоки и функции",
+    	"menu_special_blocks": "Специальные блоки",
+    	"menu_all_shapes": "Все формы",
+    	"menu_jokers": "Джокеры",
+
         "no_records": "Пока нет рекордов.",
         "no_data": "Нет значимых данных.",
         "stat_points_move": "Макс. очков за один ход",
@@ -612,6 +652,8 @@
         "stat_curses_cleared": "Снято проклятий",
 
         "desc_hammer": "Молоток: Потяните и разбейте область 2x2!",
+	"desc_bundle": "Джокер-мешочек: Сохраняет заработанные очки. Нажмите еще раз, чтобы добавить накопленные очки к вашему счету, умноженные на текущее комбо!",
+	"bundle_cash_prompt": "Нажмите, чтобы добавить",
         "desc_1x1": "Случайный блок: Потяните и поставьте блок-сюрприз!",
         "desc_shuffle": "Обновить: Заменяет текущие блоки на более легкие.",
         "desc_undo": "Отменить: Отменяет ваш последний ход.",
@@ -619,7 +661,7 @@
         "desc_cross": "Взрыв крестом: Уничтожает строку и столбец.",
         "desc_row": "Взрыв строки: Уничтожает строку при срабатывании.",
         "desc_col": "Взрыв столбца: Уничтожает столбец при срабатывании.",
-        "desc_random": "Случайный: Уничтожает 9 случайных блоков при срабатывании.",
+        "desc_random": "Сюрприз-направление: При активации случайным образом применяет горизонтальный, вертикальный или перекрестный взрыв.",
         "desc_life": "Щит: Защищает ваш множитель комбо на 7 раундов.",
         "desc_skull": "Проклятие: Начинает смертельный раунд! Постарайтесь выжить!",
         "desc_megachest_describe": "Собрав 5 ключей, вы откроете мега-сундук с уникальными наградами!",
@@ -710,6 +752,11 @@
         "death_warning": "NÖVBƏTİ TUR ÖLÜMDÜR!",
         "death_penalty": "-10K!",
 
+	"menu_blocks_title": "Bloklar və Xüsusiyyətlər",
+    	"menu_special_blocks": "Xüsusi Bloklar",
+    	"menu_all_shapes": "Bütün Formalar",
+    	"menu_jokers": "Jokerlər",
+
         "no_records": "Hələ qeyd yoxdur.",
         "no_data": "Əhəmiyyətli məlumat yoxdur.",
         "stat_points_move": "Bir Gedişdə Maksimum Xal",
@@ -725,6 +772,8 @@
         "stat_curses_cleared": "Dəf Edilən Lənət",
 
         "desc_hammer": "Çəkic: Sürüşdür və 2x2-lik sahəni qır!",
+	"desc_bundle": "Kisə Cokeri: Qazanılmış xalları toplayır. Yenidən basaraq içindəki xalları cari kombo çarpanınızla hesabınıza əlavə edin!",
+	"bundle_cash_prompt": "Hesaba əlavə etmək üçün bas",
         "desc_1x1": "Təsadüfi Blok: Sürüşdür və sürpriz bir blok qoy!",
         "desc_shuffle": "Yenilə: Bir setdəki blokları asanları ilə dəyişdirir.",
         "desc_undo": "Geri Al: Etdiyin son gedişi geri al.",
@@ -732,7 +781,7 @@
         "desc_cross": "+ Şəklində Partlat: Sətir və sütunu partladır.",
         "desc_row": "Sətiri Partlat: Tetikləndiyində olduğu sətiri yox edir.",
         "desc_col": "Sütunu Partlat: Tetikləndiyində olduğu sütunu yox edir.",
-        "desc_random": "Təsadüfi: Tetikləndiyində təsadüfi 9 bloku yox edir.",
+        "desc_random": "Sürpriz Yön: Aktivləşdirildikdə təsadüfi olaraq üfüqi, şaquli və ya çarpaz partlayış tətbiq edir.",
         "desc_life": "Qalxan: Tetikləndiyində kombo vuruğunu 7 tur boyunca qoruyur.",
         "desc_skull": "Lənət: Ölüm turu başladır! Həyatda qalmağa çalış!",
         "desc_megachest_describe": "5 açar toplananda bənzərsiz mükafatlarla dolu Meqa Sandıq açılır!",
