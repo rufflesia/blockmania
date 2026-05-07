@@ -3,14 +3,15 @@ const PALETTE = ['#9AD914', '#e02b89', '#F2B749', '#F26938', '#ba2f22', '#854BBF
 
 function rollSpecialItem() {
     let roll = Math.random() * 100;
+    let level = Math.min(10, Math.floor(score / 10000));
     if (roll < 2) return 'minus'; roll -= 2;
-    if (roll < 2.0 && gameState.chestOddsLevel < 30) return 'upg'; roll -= 2.0;
-    if (roll < 0.6 && gameState.baseBlockScore < 35) return 'scoreUp'; roll -= 0.6;
+    if (roll < 2.2 && gameState.chestOddsLevel < 30) return 'upg'; roll -= 2.2;
+    if (roll < 0.8 && gameState.baseBlockScore < 50) return 'scoreUp'; roll -= 0.8;
     if (roll < 0.45 && gameState.baseBlockScore > 1) return 'scoreDown'; roll -= 0.45;
     if (roll < 0.5) return 'cursedKey'; roll -= 0.5;
     if (roll < 0.25) return 'life'; roll -= 0.25;
-    if (roll < 0.2 && score > 20000 && !deathWave.active && score >= deathWave.nextEligibleScore) return 'skull'; roll -= 0.2;
-    if (roll < 0.05) return 'multX'; roll -= 0.05;
+    if (roll < 0.2 && score > 20000) return 'skull'; roll -= 0.2;
+    if (roll < 0.05 && level >= 1) return 'multX'; roll -= 0.05;
     if (roll < 2.2) return '+'; roll -= 2.2;
     if (roll < 2.7) return 'row'; roll -= 2.7;
     if (roll < 2.7) return 'col'; roll -= 2.7;
@@ -92,6 +93,7 @@ function getLootTable() {
     let pts250_weight = 10 - u, pts500_weight = 15 - u, pts1000_weight = 10 - u, pts1500_weight = 5;
     let m3 = 25 - u, m5 = 10;
     let shuf = 8 + (u*2), ham = 8 + (u*2), undo = 8 + (u*2), x1 = 1 + (u*2);
+    let bun = 5 + (u*2);
     
     return [
         { type: 'pts', val: CHEST_TIERS[shift], weight: pts250_weight }, 
@@ -99,7 +101,7 @@ function getLootTable() {
         { type: 'pts', val: CHEST_TIERS[shift + 2], weight: pts1000_weight }, 
         { type: 'pts', val: CHEST_TIERS[shift + 3], weight: pts1500_weight },
         { type: 'mult', val: 3, weight: m3 }, { type: 'mult', val: 5, weight: m5 },
-        { type: 'joker', val: 'shuffle', weight: shuf }, { type: 'joker', val: 'hammer', weight: ham }, { type: 'joker', val: 'undo', weight: undo }, { type: 'joker', val: '1x1', weight: x1 }
+        { type: 'joker', val: 'shuffle', weight: shuf }, { type: 'joker', val: 'hammer', weight: ham }, { type: 'joker', val: 'undo', weight: undo }, { type: 'joker', val: '1x1', weight: x1 }, { type: 'joker', val: 'bundle', weight: bun }
     ];
 }
 // ÇEVİRİ MOTORUNA BAĞLANMIŞ SANDIK GANİMET YAZILARI
@@ -122,10 +124,15 @@ function getLootData(loot) {
     if (loot.val === 'shuffle') return { iconPath: 'icons/shuffle.png', emoji: '🔀', text: getJokerName('desc_shuffle', 'Yenile Jokeri') };
     if (loot.val === 'undo') return { iconPath: 'icons/undo.png', emoji: '↩️', text: getJokerName('desc_undo', 'Geri Al Jokeri') };
     if (loot.val === '1x1') return { iconPath: 'icons/1x1.png', emoji: '🟩', text: getJokerName('desc_1x1', 'Blok') };
+    if (loot.val === 'bundle') return { iconPath: 'icons/bundle1.png', emoji: '💰', text: getJokerName('desc_bundle', 'Kese Jokeri') };
 }
 
 function rollLoot() {
     let table = getLootTable();
+    let hasBundle = playerJokers.some(j => j.type === 'bundle');
+    if (hasBundle) {
+        table = table.filter(i => !(i.type === 'joker' && i.val === 'bundle'));
+    }
     if (playerJokers.length >= 3) { 
         table = table.filter(i => i.type !== 'joker'); 
         table[0].weight += 10; table[1].weight += 10; table[2].weight += 5; 
