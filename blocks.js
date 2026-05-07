@@ -90,8 +90,8 @@ function getLootTable() {
     // Yüzde eksiye düşüp matematiği bozmasın diye u'yu en fazla 9'da sabitliyoruz
     let u = Math.min(gameState.chestOddsLevel, 9);
     
-    let pts250_weight = 10 - u, pts500_weight = 15 - u, pts1000_weight = 10 - u, pts1500_weight = 5;
-    let m3 = 25 - u, m5 = 10;
+    let pts250_weight = 30 - u, pts500_weight = 20 - u, pts1000_weight = 10 - u, pts1500_weight = 5;
+    let m3 = 12 - u, m5 = 8;
     let shuf = 8 + (u*2), ham = 8 + (u*2), undo = 8 + (u*2), x1 = 1 + (u*2);
     let bun = 5 + (u*2);
     
