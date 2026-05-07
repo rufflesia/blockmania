@@ -15,9 +15,10 @@ const carouselItems = [
     { src: 'icons/random.png', textKey: "desc_random" },
     { src: 'icons/life.png', textKey: "desc_life" },
     { src: 'icons/skull.png', textKey: "desc_skull" },
-    { src: 'icons/megachest_describe.png', textKey: "desc_megachest_describe" },
+    { src: 'icons/megachest_describe.png', textKey: "desc_megachest_describe", scale: 1.4 },
     { src: 'icons/megacombo.png', textKey: "desc_megacombo" },
-    { src: 'icons/multiway.png', textKey: "desc_multiway" }
+    { src: 'icons/bundle1.png', textKey: "desc_bundle" },
+    { src: 'icons/multiway.png', textKey: "desc_multiway", scale: 1.8}
 ];
 
 window.startCarousel = function() {
@@ -38,6 +39,12 @@ window.startCarousel = function() {
 
     setTimeout(() => {
         let translatedText = (typeof t === 'function') ? t(item.textKey) : item.textKey;
+
+	if (item.scale) {
+            imgEl.style.transform = `scale(${item.scale})`;
+        } else {
+            imgEl.style.transform = 'scale(1)';
+        }
         
         textEl.innerText = translatedText;
         imgEl.src = item.src;
@@ -84,6 +91,9 @@ window.showMainMenuOnGrid = function() {
 // BUTON DİNLEYİCİLERİ
 if (playMainBtn) {
     playMainBtn.addEventListener('click', () => {
+	
+	if (typeof window.closeAllMenus === "function") window.closeAllMenus();
+
         if (typeof checkSavedGame === "function" && checkSavedGame()) {
             savePopup.classList.add('show');
         } else {
@@ -197,6 +207,7 @@ document.addEventListener('click', (e) => {
 });
 
 function startGameDirectly() {
+    window.closeAllMenus();
     mainMenuOverlay.classList.remove('show');
     clearTimeout(carouselTimer); 
     if(typeof isGameRunning !== 'undefined') isGameRunning = true;
@@ -221,24 +232,6 @@ window.closeBlocksMenu = function() {
 function initBlocksMenu() {
     const specCont = document.getElementById('blocks-special-container');
     if (specCont.innerHTML !== '') return; // Zaten yüklüyse tekrar yükleme
-
-    // 1. ÖZEL BLOKLAR
-    const specialTypes = ['+', 'row', 'col', '?', 'M', 'X', 'life', 'multX', 'upg', 'scoreUp', 'scoreDown', 'cursedKey', 'minus', 'skull'];
-    specialTypes.forEach(type => {
-        let div = document.createElement('div');
-        div.style.cssText = "position:relative; min-width:55px; height:55px; flex-shrink:0; cursor:pointer;";
-        
-        // game.js'deki HTML'i çekiyoruz ama içindeki tooltip metnini ayırıp Global Tooltip için saklıyoruz
-        let tempDiv = document.createElement('div');
-        tempDiv.innerHTML = getIconHTML(type, undefined, undefined);
-        let innerTooltip = tempDiv.querySelector('.special-tooltip');
-        let textContent = innerTooltip ? innerTooltip.innerHTML : '';
-        if (innerTooltip) innerTooltip.remove(); // HTML'in içindekini siliyoruz (kesilmesin diye)
-        
-        div.innerHTML = tempDiv.innerHTML; 
-        setupGlobalLongPress(div, textContent);
-        specCont.appendChild(div);
-    });
 
     // 2. TÜM MATRİS ŞEKİLLERİ (DAHA BÜYÜK)
     const shapesCont = document.getElementById('blocks-shapes-container');
@@ -269,19 +262,35 @@ function initBlocksMenu() {
             shapesCont.appendChild(wrapper);
         });
     }
+    // 1. ÖZEL BLOKLAR
+    const specialTypes = ['+', 'row', 'col', '?', 'M', 'X', 'life', 'multX', 'upg', 'scoreUp', 'scoreDown', 'cursedKey', 'minus', 'skull'];
+    specialTypes.forEach(type => {
+        let div = document.createElement('div');
+        div.style.cssText = "position:relative; min-width:40px; height:40px; flex-shrink:0; cursor:pointer;";
+        
+        // game.js'deki HTML'i çekiyoruz ama içindeki tooltip metnini ayırıp Global Tooltip için saklıyoruz
+        let tempDiv = document.createElement('div');
+        tempDiv.innerHTML = getIconHTML(type, undefined, undefined);
+        let innerTooltip = tempDiv.querySelector('.special-tooltip');
+        let textContent = innerTooltip ? innerTooltip.innerHTML : '';
+        if (innerTooltip) innerTooltip.remove(); // HTML'in içindekini siliyoruz (kesilmesin diye)
+        
+        div.innerHTML = tempDiv.innerHTML; 
+        setupGlobalLongPress(div, textContent);
+        specCont.appendChild(div);
+    });
 
     // 3. JOKERLER (SABİT ALANDA)
     const jokersCont = document.getElementById('blocks-jokers-container');
-    const jokerTypes = ['hammer', '1x1', 'shuffle', 'undo'];
+    const jokerTypes = ['hammer', '1x1', 'shuffle', 'undo', 'bundle'];
     jokerTypes.forEach(type => {
         let div = document.createElement('div');
         div.className = 'joker-slot has-item';
-        div.style.cssText = "position:relative; min-width:55px; height:55px; flex-shrink:0; cursor:pointer; background:#f0f0f0; border-radius:10px; display:flex; justify-content:center; align-items:center;";
-        
-        let path = `icons/${type}.png`;
+        div.style.cssText = "position:relative; min-width:40px; height:40px; flex-shrink:0; cursor:pointer; background:#f0f0f0; border-radius:8px; display:flex; justify-content:center; align-items:center;";
+        let path = type === 'bundle' ? 'icons/bundle1.png' : `icons/${type}.png`;
         let textContent = typeof getJokerTooltipDesc === 'function' ? getJokerTooltipDesc(type) : t('desc_' + type);
         
-        div.innerHTML = `<img src="${path}" style="width:75%; height:75%; object-fit:contain; pointer-events:none;">`;
+        div.innerHTML = `<img src="${path}" style="width:30px; height:30px; object-fit:contain; pointer-events:none;">`;
         
         setupGlobalLongPress(div, textContent);
         jokersCont.appendChild(div);
@@ -452,3 +461,14 @@ window.hideSmartTooltip = function() {
         }, 200);
     }
 }
+
+// OYUNA GİRİŞTE TÜM AÇIK MENÜLERİ TEMİZLEYEN GÜVENLİK FONKSİYONU
+window.closeAllMenus = function() {
+    if (typeof window.closeSettings === "function") window.closeSettings();
+    if (typeof window.closeStats === "function") window.closeStats();
+    if (typeof window.closeBlocksMenu === "function") window.closeBlocksMenu();
+    
+    // Eğitim modu onay penceresi açıksa onu da yok et
+    const tutPopup = document.getElementById('tut-confirm-popup');
+    if (tutPopup) tutPopup.remove();
+};
