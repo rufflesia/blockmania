@@ -107,7 +107,7 @@
                 <div id="menu-top-bar" style="position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; z-index: 10;">
                     <div style="display: flex; gap: 10px;">
                         <button class="menu-sq-btn menu-top-btn" id="menu-settings-btn"><img src="icons/settings.png" alt="Settings" onerror="this.outerHTML='<span style=\'font-size:1.2rem;\'>⚙️</span>'"></button>
-                        <button class="menu-sq-btn menu-top-btn" id="menu-blocks-btn"><span style='font-size:1.2rem;'>🧱</span></button>
+                        <button class="menu-sq-btn menu-top-btn" id="menu-blocks-btn"><img src="icons/blocks.png" alt="icon"onerror="this.outerHTML='<span style=\'font-size:1.2rem;\'>🧱</span>'"></button>
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <button class="menu-sq-btn menu-top-btn" id="menu-stats-btn"><img src="icons/stats.png" alt="Stats" onerror="this.outerHTML='<span style=\'font-size:1.2rem;\'>📊</span>'"></button>
@@ -224,24 +224,24 @@
     <button onclick="window.closeBlocksMenu()" style="position:absolute; top:10px; right:15px; background:none; border:none; font-size:1.5rem; color:#e74c3c; font-weight:bold; cursor:pointer; z-index:350;">X</button>
     
     <!-- BAŞLIK (SABİT) -->
-    <h2 style="color:#2c3e50; margin-top:0; margin-bottom: 10px; text-align:center; flex-shrink:0;">Bloklar & Özellikler</h2>
+<h2 style="color:#2c3e50; margin-top:0; margin-bottom: 10px; text-align:center; flex-shrink:0;" data-i18n="menu_blocks_title">Bloklar & Özellikler</h2>
 
-    <!-- ORTA ALAN (AŞAĞI YUKARI KAYABİLİR) -->
-    <div style="flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom: 20px;" class="hide-scrollbar">
-        
-        <div style="font-weight:bold; color:#34495e; margin-bottom:10px; font-size: 0.9rem;">Özel Bloklar</div>
-        <div id="blocks-special-container" style="display:flex; gap:20px; overflow-x:auto; padding:5px 5px 15px 5px; margin-bottom: 15px; touch-action: pan-x;" class="hide-scrollbar"></div>
+<!-- ORTA ALAN (AŞAĞI YUKARI KAYABİLİR) -->
+<div style="flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom: 20px;" class="hide-scrollbar">
+  
 
-        <div style="font-weight:bold; color:#34495e; margin-bottom:10px; font-size: 0.9rem;">Tüm Şekiller</div>
-        <div id="blocks-shapes-container" style="display:flex; gap:35px; overflow-x:auto; padding:15px 5px 25px 15px; margin-bottom: 5px; align-items:center; touch-action: pan-x;" class="hide-scrollbar"></div>
-        
-    </div>
+    <div style="font-weight:bold; color:#34495e; margin-bottom:10px; font-size: 0.9rem;" data-i18n="menu_all_shapes">Tüm Şekiller</div>
+    <div id="blocks-shapes-container" style="display:flex; gap:35px; overflow-x:auto; padding:15px 5px 25px 15px; margin-bottom: 5px; align-items:center; touch-action: pan-x;" class="hide-scrollbar"></div>
+<div style="font-weight:bold; color:#34495e; margin-bottom:10px; font-size: 0.9rem;" data-i18n="menu_special_blocks">Özel Bloklar</div>
+    <div id="blocks-special-container" style="display:flex; gap:20px; overflow-x:auto; padding:5px 5px 15px 5px; margin-bottom: 15px; touch-action: pan-x;" class="hide-scrollbar"></div>
+    
+</div>
 
-    <!-- ALT ALAN: JOKERLER (Ekranda Daima Sabit Kalır) -->
-    <div style="flex-shrink:0; padding-top:15px; padding-bottom:20px; border-top: 2px solid #ecf0f1; background: transparent;">
-        <div style="font-weight:bold; color:#34495e; margin-bottom:10px; font-size: 0.9rem;">Jokerler</div>
-        <div id="blocks-jokers-container" style="display:flex; gap:20px; overflow-x:auto; touch-action: pan-x;" class="hide-scrollbar"></div>
-    </div>
+<!-- ALT ALAN: JOKERLER -->
+<div style="flex-shrink:0; padding-top:15px; padding-bottom:20px; border-top: 2px solid #ecf0f1; background: transparent;">
+    <div style="font-weight:bold; color:#34495e; margin-bottom:10px; font-size: 0.9rem;" data-i18n="menu_jokers">Jokerler</div>
+    <div id="blocks-jokers-container" style="display:flex; gap:20px; overflow-x:auto; touch-action: pan-x;" class="hide-scrollbar"></div>
+</div>
 
 </div>
             
