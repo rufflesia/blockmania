@@ -52,6 +52,10 @@
         'icons/cursedKey.png',
         'icons/minus.png',
         'icons/hammer_icon.png',
+	'icons/bundle1.png',
+        'icons/bundle2.png',
+        'icons/bundle3.png',
+        'icons/bundle4.png',
         'assets/crack.png',
         'blockmania.png',
     ];
