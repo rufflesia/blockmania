@@ -31,6 +31,21 @@
 
 window.SFX = (function () {
     'use strict';
+     // --- YENİ: MİKSERDEN GELEN ÖZEL SES SEVİYELERİ ---
+    const customVolumes = {
+        "place1": 1,
+        "place2": 1,
+        "place3": 1,
+        "place4": 1,
+        "place5": 1,
+        "combo_1": 0.31,
+        "combo_2": 0.27,
+        "combo_3": 0.28,
+        "combo_4": 0.26, 
+        "combo_5": 0.28,
+        "add_score": 0.05,
+        "add_bundle": 0.67
+    };
 
     // ── AUDIO CONTEXT (lazy init to satisfy autoplay policy) ──
     let ctx = null;
@@ -100,7 +115,10 @@ function load(name) {
             const src = ctx.createBufferSource();
             src.buffer = buf;
             const g = ctx.createGain();
-            g.gain.value = opts.volume ?? 1;
+            let mixerMultiplier = customVolumes[name] !== undefined ? customVolumes[name] : 1.0;
+            
+            // Koddan gelen varsayılan ses ile (opts.volume) mikser değerini çarpıyoruz
+            g.gain.value = (opts.volume ?? 1) * mixerMultiplier;
             src.connect(g);
             g.connect(sfxGain);
             if (opts.rate) src.playbackRate.value = opts.rate;
