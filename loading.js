@@ -81,6 +81,7 @@
                 position: fixed;
                 inset: 0;
                 z-index: 99999;
+		background-color: #12141a;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -238,10 +239,21 @@
 
     function setInitialBg() {
         bgIndex = Math.floor(Math.random() * BG_COUNT) + 1;
-        bgA.style.backgroundImage = `url('${getBgSrc(bgIndex)}')`;
-        bgA.style.opacity = '1';
+        const src = getBgSrc(bgIndex);
+
+        // Başlangıçta ikisi de görünmez olsun (Arkadaki şık zemin rengi #12141a görünecek)
+        bgA.style.opacity = '0';
         bgB.style.opacity = '0';
         activeBg = 'A';
+
+        // Görseli arkada gizlice yükle
+        const firstBgImg = new Image();
+        firstBgImg.onload = () => {
+            // Yükleme bitince URL'i ata ve yavaşça görünür yap
+            bgA.style.backgroundImage = `url('${src}')`;
+            bgA.style.opacity = '1'; // CSS'teki transition sayesinde yumuşakça belirecek
+        };
+        firstBgImg.src = src;
     }
 
     function rotateBg() {
