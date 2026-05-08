@@ -1034,7 +1034,7 @@ button.btn-primary:hover {
 
 .piece-wrapper.disabled {
     opacity: 0.25;
-    filter: grayscale(100%); !important;
+    filter: grayscale(100%) !important;
     pointer-events: none;
 }
 
@@ -1596,3 +1596,4 @@ button.btn-primary:hover {
     
     overflow-y: visible !important; /* Kırpılmaları önler */
 }
+
