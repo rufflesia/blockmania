@@ -1,4 +1,67 @@
+const customVolumes = {
+    "place1": 1,
+    "place2": 1,
+    "place3": 1,
+    "place4": 1,
+    "place5": 1,
+    "combo1": 0.31,
+    "combo2": 0.20,
+    "combo3": 0.20,
+    "combo4": 0.20,
+    "combo5": 0.20,
+    "add_score": 0.25,
+    "add_bundle": 0.67
+};
+
 // ==========================================
+// DİNAMİK SES ÇALMA MOTORU
+// ==========================================
+window.playDynamicSound = function(type, value) {
+    // Eğer oyunda genel ses kapalıysa iptal et
+    if (typeof userSettings !== 'undefined' && userSettings.volumeSfx === 0) return;
+
+    try {
+        let audioSrc = '';
+        let playbackRate = 1.0;
+        let soundKey = ''; // Mikserdeki ismini eşleştirmek için eklendi
+
+        if (type === 'combo') {
+            let idx = Math.min(value - 1, 5); 
+            if (idx < 1) return; 
+            audioSrc = `sounds/combo${idx}.mp3`;
+            soundKey = `combo${idx}`; // customVolumes'taki ismi
+            
+        } else if (type === 'score') {
+            audioSrc = 'sounds/add_score.mp3';
+            soundKey = 'add_score'; // customVolumes'taki ismi
+            playbackRate = Math.min(2.0, 1.0 + (value / 5000));
+            
+        } else if (type === 'bundle') {
+            audioSrc = 'sounds/add_bundle.mp3';
+            soundKey = 'add_bundle'; // customVolumes'taki ismi
+            playbackRate = Math.min(2.0, 1.0 + (value / 5000));
+        }
+
+        if (!audioSrc) return;
+
+        let snd = new Audio(audioSrc);
+        snd.playbackRate = playbackRate;
+        snd.preservesPitch = false; 
+        
+        // --- YENİ: MİKSER HESAPLAMASI ---
+        // Oyunun ana ses seviyesi (Örn: Ayarlardan %80 yapıldıysa 0.8 olur)
+        let masterVol = typeof userSettings !== 'undefined' ? (userSettings.volumeSfx / 100) : 1.0;
+        
+        // Yukarıdaki customVolumes listesinden bu sese ait özel ayarı çekiyoruz (Yoksa 1.0)
+        let specificVol = customVolumes[soundKey] !== undefined ? customVolumes[soundKey] : 1.0;
+
+        // Asıl ses = Ana Ses x Mikser Ayarı
+        snd.volume = specificVol * masterVol;
+        // --------------------------------
+
+        snd.play().catch(e => console.log("Ses çalınamadı:", e));
+    } catch(e) {}
+};
 // i18n (ÇEVİRİ VE DİL MOTORU) - JSON FETCH
 // ==========================================
 let i18n = {}; // JSON'dan dolacak boş obje
@@ -132,6 +195,7 @@ window.flyPointsToPouch = function(pts, targetEl) {
         setTimeout(() => {
             if (f.parentNode) f.remove();
             targetEl.classList.add('chest-pop-anim');
+	    if (typeof window.playDynamicSound === 'function') window.playDynamicSound('bundle', pts);
             setTimeout(() => targetEl.classList.remove('chest-pop-anim'), 300);
         }, 400);
     }, 300);
@@ -1891,6 +1955,7 @@ function executeAreaChains(areas, chainCombo) {
         }
 
         combo++;
+	if (typeof window.playDynamicSound === 'function') window.playDynamicSound('combo', combo);
         updateComboUI();
         fireAgroMultiplier(Math.min(combo, 10));
         if(typeof SFX!=='undefined') SFX.areaBlock(); // SFX KORUNDU
@@ -2044,6 +2109,7 @@ function checkBoardLogic(isFreeTurn=false, placementPoints=0) {
 
     if (toClear.size > 0) {
         combo++;
+	if (typeof window.playDynamicSound === 'function') window.playDynamicSound('combo', combo);
         let mult = calculateMultiplier(rowsCleared, colsCleared, boxesCleared);
         let clearPts = toClear.size * gameState.baseBlockScore * mult * combo;
         
@@ -2554,6 +2620,7 @@ function tallyPoints(pts) {
         setTimeout( () => {
             score += pts;
             score = Math.max(0, score);
+            if (typeof window.playDynamicSound === 'function') window.playDynamicSound('score', pts);
             document.getElementById('score').innerText = formatScore(score);
             let s = document.getElementById('score');
             s.style.transform = 'scale(1.3)';
