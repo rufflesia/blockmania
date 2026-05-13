@@ -51,7 +51,7 @@
         "stat_curses_cleared": "Atlatılan Lanet",
 
         "desc_hammer": "Çekiç: Sürükle ve 2x2'lik alanı kır!",
-	"desc_bundle": "Kese Jokeri: Kazanılan puanları depolar. Tekrar basarak içindeki puanları o anki kombo çarpanınla skora katlayarak ekle!",
+	"desc_bundle": "Kese Jokeri: Kazanılan puanları biriktirebileceğin bir kese. İstediğin zaman puanları kullanabilirsin!",
         "bundle_cash_prompt": "Skora eklemek için bas",
         "desc_1x1": "Random Blok: Sürükle ve sürpriz bir blok koy!",
         "desc_shuffle": "Yenile: Bir setteki blokları kolayları ile değiştirir.",
@@ -64,7 +64,7 @@
         "desc_life": "Kalkan: Tetiklendiğinde kombo çarpanını 7 tur boyunca korur.",
         "desc_skull": "Lanet: Ölüm turu başlatır! Hayatta kalmaya çalış!",
         "desc_megachest_describe": "5 anahtar toplanınca eşsiz ödüllerle dolu Mega Sandık açılır!",
-        "desc_megacombo": "Mega combo! Combo sayacı ile ekstra x5 çarpanı aynı anda tetikle!",
+        "desc_megacombo": "Mega combo! Combo sayacı ile ekstra çarpanı aynı anda tetikle!",
         "desc_multiway": "Tek seferde çok yönde patlatarak devasa skor çarpanı kazan!",
 
         "settings_title": "Ayarlar",
@@ -78,8 +78,11 @@
         "reset_confirm": "Tüm verilerinizi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!",
         
         "loot_pts": "Puan",
-        "loot_mult": "x5 Çarpan",
+        "loot_mult": "Çarpan",
         "loot_turns": "Tur",
+        "rotate_device": "Lütfen cihazınızı dikey konuma çevirin",
+"odds_multiplier": "Çarpan Çıkma Oranı",
+"odds_1x1": "1x1 Blok",
 
         "tut_confirm_title": "Eğitim Modunu Başlat?",
         "tut_confirm_body": "Temel mekanikleri adım adım öğrenmek ister misin?",
@@ -144,6 +147,9 @@
         "play_again_btn": "Play Again",
         "main_menu_btn": "Main Menu",
         "drag_to_start": "Drag to Start",
+"rotate_device": "Please rotate your device to portrait mode",
+"odds_multiplier": "Multiplier Drop Rate",
+"odds_1x1": "1x1 Block",
         
         "skull_warning": "DEATH ROUND INCOMING!",
         "dw_title": "💀 DEATH ROUND 💀",
@@ -185,7 +191,7 @@
         "desc_life": "Shield: Protects your combo multiplier for 7 rounds when triggered.",
         "desc_skull": "Curse: Starts a death round! Try to survive!",
         "desc_megachest_describe": "Collecting 5 keys opens the Mega Chest filled with unique rewards!",
-        "desc_megacombo": "Mega combo! Trigger the combo counter and the extra x5 multiplier at the same time!",
+        "desc_megacombo": "Mega combo! Trigger the combo counter and the extra multiplier at the same time!",
         "desc_multiway": "Multiway! Blast in multiple directions at once to earn a massive score multiplier!",
 
         "settings_title": "Settings",
@@ -199,7 +205,7 @@
         "reset_confirm": "Are you sure you want to delete all your data? This action cannot be undone!",
         
         "loot_pts": "Points",
-        "loot_mult": "x5 Multiplier",
+        "loot_mult": "Multiplier",
         "loot_turns": "Turns",
 
         "tut_confirm_title": "Start Tutorial Mode?",
@@ -271,7 +277,9 @@
         "dw_threat": "Bedrohung:",
         "death_warning": "NÄCHSTE RUNDE IST DER TOD!",
         "death_penalty": "-10K!",
-
+"rotate_device": "Bitte drehen Sie Ihr Gerät ins Hochformat",
+"odds_multiplier": "Multiplikator-Chance",
+"odds_1x1": "1x1 Block",
 	"menu_blocks_title": "Blöcke & Funktionen",
     	"menu_special_blocks": "Spezialblöcke",
     	"menu_all_shapes": "Alle Formen",
@@ -305,7 +313,7 @@
         "desc_life": "Schild: Schützt deinen Kombo-Multiplikator für 7 Runden.",
         "desc_skull": "Fluch: Startet eine Todesrunde! Versuch zu überleben!",
         "desc_megachest_describe": "Das Sammeln von 5 Schlüsseln öffnet die Mega-Truhe mit einzigartigen Belohnungen!",
-        "desc_megacombo": "Mega-Kombo! Löse den Kombo-Zähler und den extra x5 Multiplikator gleichzeitig aus!",
+        "desc_megacombo": "Mega-Kombo! Löse den Kombo-Zähler und den extra Multiplikator gleichzeitig aus!",
         "desc_multiway": "Mehrwege-Explosion! Zerstöre in mehrere Richtungen gleichzeitig, um einen riesigen Punkte-Multiplikator zu erhalten!",
 
         "settings_title": "Einstellungen",
@@ -319,7 +327,7 @@
         "reset_confirm": "Bist du sicher, dass du alle deine Daten löschen möchtest? Dies kann nicht rückgängig gemacht werden!",
         
         "loot_pts": "Punkte",
-        "loot_mult": "x5 Multiplikator",
+        "loot_mult": "Multiplikator",
         "loot_turns": "Runden",
 
         "tut_confirm_title": "Tutorial-Modus starten?",
@@ -396,7 +404,9 @@
     	"menu_special_blocks": "Bloques Especiales",
     	"menu_all_shapes": "Todas las Formas",
     	"menu_jokers": "Comodines",
-
+"rotate_device": "Gira tu dispositivo a modo vertical",
+"odds_multiplier": "Probabilidad de Multiplicador",
+"odds_1x1": "Bloque 1x1",
         "no_records": "Sin registros aún.",
         "no_data": "Sin datos significativos.",
         "stat_points_move": "Puntos Máximos en un Movimiento",
@@ -425,7 +435,7 @@
         "desc_life": "Escudo: Protege tu multiplicador de combo durante 7 rondas al activarse.",
         "desc_skull": "Maldición: ¡Inicia una ronda de muerte! ¡Intenta sobrevivir!",
         "desc_megachest_describe": "¡Recolectar 5 llaves abre el Mega Cofre lleno de recompensas únicas!",
-        "desc_megacombo": "¡Mega combo! ¡Activa el contador de combo y el multiplicador x5 adicional al mismo tiempo!",
+        "desc_megacombo": "¡Mega combo! ¡Activa el contador de combo y el multiplicador adicional al mismo tiempo!",
         "desc_multiway": "¡Multidireccional! ¡Explota en múltiples direcciones a la vez para ganar un multiplicador de puntuación masivo!",
 
         "settings_title": "Ajustes",
@@ -439,7 +449,7 @@
         "reset_confirm": "¿Estás seguro de que deseas eliminar todos tus datos? ¡Esta acción no se puede deshacer!",
         
         "loot_pts": "Puntos",
-        "loot_mult": "Multiplicador x5",
+        "loot_mult": "Multiplicador",
         "loot_turns": "Turnos",
 
         "tut_confirm_title": "¿Iniciar Modo Tutorial?",
@@ -504,7 +514,9 @@
         "play_again_btn": "再玩一次",
         "main_menu_btn": "主菜单",
         "drag_to_start": "拖动以开始",
-        
+"rotate_device": "请将设备旋转至竖屏模式",
+"odds_multiplier": "乘数出现率",
+"odds_1x1": "1x1 方块",        
         "skull_warning": "死亡回合即将来临！",
         "dw_title": "💀 死亡回合 💀",
         "dw_rounds_left": "剩余回合:",
@@ -545,7 +557,7 @@
         "desc_life": "护盾：触发时在7个回合内保护你的连击倍数。",
         "desc_skull": "诅咒：开启死亡回合！努力生存下来！",
         "desc_megachest_describe": "收集5把钥匙可打开充满独特奖励的超级宝箱！",
-        "desc_megacombo": "超级连击！同时触发连击计数器和额外的x5倍数！",
+        "desc_megacombo": "超级连击！同时触发连击计数器和额外的倍数！",
         "desc_multiway": "多向爆破！同时在多个方向进行爆破以获得巨大的分数倍数！",
 
         "settings_title": "设置",
@@ -559,7 +571,7 @@
         "reset_confirm": "您确定要删除所有数据吗？此操作无法撤销！",
         
         "loot_pts": "分数",
-        "loot_mult": "x5倍数",
+        "loot_mult": "倍数",
         "loot_turns": "回合",
 
         "tut_confirm_title": "开始教程模式？",
@@ -624,7 +636,9 @@
         "play_again_btn": "Играть снова",
         "main_menu_btn": "Главное меню",
         "drag_to_start": "Потяните, чтобы начать",
-        
+  "rotate_device": "Пожалуйста, поверните устройство в портретный режим",
+"odds_multiplier": "Шанс выпадения множителя",
+"odds_1x1": "1x1 Блок",      
         "skull_warning": "ПРИБЛИЖАЕТСЯ СМЕРТЕЛЬНЫЙ РАУНД!",
         "dw_title": "💀 СМЕРТЕЛЬНЫЙ РАУНД 💀",
         "dw_rounds_left": "Осталось раундов:",
@@ -665,7 +679,7 @@
         "desc_life": "Щит: Защищает ваш множитель комбо на 7 раундов.",
         "desc_skull": "Проклятие: Начинает смертельный раунд! Постарайтесь выжить!",
         "desc_megachest_describe": "Собрав 5 ключей, вы откроете мега-сундук с уникальными наградами!",
-        "desc_megacombo": "Мега комбо! Активируйте счетчик комбо и дополнительный множитель x5 одновременно!",
+        "desc_megacombo": "Мега комбо! Активируйте счетчик комбо и дополнительный множитель одновременно!",
         "desc_multiway": "Мультивзрыв! Взорвите блоки в нескольких направлениях сразу, чтобы получить огромный множитель очков!",
 
         "settings_title": "Настройки",
@@ -679,7 +693,7 @@
         "reset_confirm": "Вы уверены, что хотите удалить все свои данные? Это действие нельзя отменить!",
         
         "loot_pts": "Очки",
-        "loot_mult": "Множитель x5",
+        "loot_mult": "Множитель",
         "loot_turns": "Раунды",
 
         "tut_confirm_title": "Запустить режим обучения?",
@@ -744,7 +758,9 @@
         "play_again_btn": "Yenidən Oyna",
         "main_menu_btn": "Əsas Menyu",
         "drag_to_start": "Başlamaq üçün Sürüşdür",
-        
+        "rotate_device": "Zəhmət olmasa cihazınızı şaquli vəziyyətə çevirin",
+"odds_multiplier": "Çarpan Çıxma Ehtimalı",
+"odds_1x1": "1x1 Blok",
         "skull_warning": "ÖLÜM TURU GƏLİR!",
         "dw_title": "💀 ÖLÜM TURU 💀",
         "dw_rounds_left": "Qalan Tur:",
@@ -785,7 +801,7 @@
         "desc_life": "Qalxan: Tetikləndiyində kombo vuruğunu 7 tur boyunca qoruyur.",
         "desc_skull": "Lənət: Ölüm turu başladır! Həyatda qalmağa çalış!",
         "desc_megachest_describe": "5 açar toplananda bənzərsiz mükafatlarla dolu Meqa Sandıq açılır!",
-        "desc_megacombo": "Meqa kombo! Kombo sayğacı ilə əlavə x5 vuruğunu eyni anda tetiklə!",
+        "desc_megacombo": "Meqa kombo! Kombo sayğacı ilə əlavə vuruğunu eyni anda tetiklə!",
         "desc_multiway": "Çox istiqamətli! Eyni anda bir çox istiqamətdə partladaraq nəhəng hesab vuruğu qazan!",
 
         "settings_title": "Tənzimləmələr",
@@ -799,7 +815,7 @@
         "reset_confirm": "Bütün məlumatlarınızı silmək istədiyinizə əminsiniz? Bu əməliyyat geri alına bilməz!",
         
         "loot_pts": "Xal",
-        "loot_mult": "x5 Vuruq",
+        "loot_mult": "Vuruq",
         "loot_turns": "Tur",
 
         "tut_confirm_title": "Təlim Modunu Başlat?",
