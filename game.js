@@ -1,66 +1,35 @@
-const customVolumes = {
-    "place1": 1,
-    "place2": 1,
-    "place3": 1,
-    "place4": 1,
-    "place5": 1,
-    "combo1": 0.31,
-    "combo2": 0.20,
-    "combo3": 0.20,
-    "combo4": 0.20,
-    "combo5": 0.20,
-    "add_score": 0.25,
-    "add_bundle": 0.67
-};
+
 
 // ==========================================
-// DİNAMİK SES ÇALMA MOTORU
+// DİNAMİK SES ÇALMA MOTORU (iOS DOSTU - WEB AUDIO API)
 // ==========================================
 window.playDynamicSound = function(type, value) {
-    // Eğer oyunda genel ses kapalıysa iptal et
-    if (typeof userSettings !== 'undefined' && userSettings.volumeSfx === 0) return;
+    // SFX motoru veya playCustom yoksa iptal et
+    if (typeof SFX === 'undefined' || !SFX.playCustom) return;
 
-    try {
-        let audioSrc = '';
-        let playbackRate = 1.0;
-        let soundKey = ''; // Mikserdeki ismini eşleştirmek için eklendi
+    let soundKey = '';
+    let playbackRate = 1.0;
 
-        if (type === 'combo') {
-            let idx = Math.min(value - 1, 5); 
-            if (idx < 1) return; 
-            audioSrc = `sounds/combo${idx}.mp3`;
-            soundKey = `combo${idx}`; // customVolumes'taki ismi
-            
-        } else if (type === 'score') {
-            audioSrc = 'sounds/add_score.mp3';
-            soundKey = 'add_score'; // customVolumes'taki ismi
-            playbackRate = Math.min(2.0, 1.0 + (value / 5000));
-            
-        } else if (type === 'bundle') {
-            audioSrc = 'sounds/add_bundle.mp3';
-            soundKey = 'add_bundle'; // customVolumes'taki ismi
-            playbackRate = Math.min(2.0, 1.0 + (value / 5000));
-        }
-
-        if (!audioSrc) return;
-
-        let snd = new Audio(audioSrc);
-        snd.playbackRate = playbackRate;
-        snd.preservesPitch = false; 
+    if (type === 'combo') {
+        let idx = Math.min(value - 1, 5); 
+        if (idx < 1) return; 
+        // DİKKAT: sound.js içindeki özel mikser isimleriyle (combo_1, combo_2) eşleşmesi için alt tire koyuyoruz!
+        soundKey = `combo${idx}`; 
         
-        // --- YENİ: MİKSER HESAPLAMASI ---
-        // Oyunun ana ses seviyesi (Örn: Ayarlardan %80 yapıldıysa 0.8 olur)
-        let masterVol = typeof userSettings !== 'undefined' ? (userSettings.volumeSfx / 100) : 1.0;
+    } else if (type === 'score') {
+        soundKey = 'add_score';
+        playbackRate = Math.min(2.0, 1.0 + (value / 5000));
         
-        // Yukarıdaki customVolumes listesinden bu sese ait özel ayarı çekiyoruz (Yoksa 1.0)
-        let specificVol = customVolumes[soundKey] !== undefined ? customVolumes[soundKey] : 1.0;
+    } else if (type === 'bundle') {
+        soundKey = 'add_bundle';
+        playbackRate = Math.min(2.0, 1.0 + (value / 5000));
+    }
 
-        // Asıl ses = Ana Ses x Mikser Ayarı
-        snd.volume = specificVol * masterVol;
-        // --------------------------------
+    if (!soundKey) return;
 
-        snd.play().catch(e => console.log("Ses çalınamadı:", e));
-    } catch(e) {}
+    // YENİ: Artık "new Audio()" YARATMIYORUZ! 
+    // Sesleri hafızada şişirmeyen usta motora (sound.js) devrediyoruz.
+    SFX.playCustom(soundKey, playbackRate);
 };
 // i18n (ÇEVİRİ VE DİL MOTORU) - JSON FETCH
 // ==========================================
@@ -166,6 +135,42 @@ window.getBundleStats = function(currentScore) {
     return { level: 4, cap: 75000 };
 };
 
+// ==========================================
+// YENİ: SANDIK SEVİYESİNE GÖRE ÇARPAN GÜCÜ
+// ==========================================
+window.getMultValue = function(level) {
+    // x2'den başlar, her 3 seviyede 1 artar. Maksimum x8 olur.
+    return Math.min(8, 2 + Math.floor((level || 0) / 3));
+};
+
+// Sandık seviyesine göre tur düşme ihtimallerini hesaplar
+window.getMultTurnsDistribution = function(level) {
+    let t3 = 0, t4 = 0, t5 = 0, t6 = 0;
+    if (level < 10) {
+        t3 = 100 - (level * 10);
+        t4 = level * 10;
+    } else if (level < 20) {
+        t4 = 100 - ((level - 10) * 10);
+        t5 = (level - 10) * 10;
+    } else if (level < 30) {
+        t5 = 100 - ((level - 20) * 10);
+        t6 = (level - 20) * 10;
+    } else {
+        t6 = 100; // 30. Seviye ve sonrasında %100 ihtimalle 6 Tur!
+    }
+    return { 3: t3, 4: t4, 5: t5, 6: t6 };
+};
+
+// Sandıktan çarpan çıktığında kaç tur süreceğini kura ile çeker
+window.rollMultTurns = function(level) {
+    let dist = getMultTurnsDistribution(level);
+    let rand = Math.random() * 100;
+    if (rand < dist[3]) return 3;
+    if (rand < dist[3] + dist[4]) return 4;
+    if (rand < dist[3] + dist[4] + dist[5]) return 5;
+    return 6;
+};
+
 // Puanların ana skordan ziyade keseye uçmasını sağlayan sistem
 window.flyPointsToPouch = function(pts, targetEl) {
     const f = document.createElement('div');
@@ -264,7 +269,8 @@ let dragInfo = {
 let playerKeys = 0;
 let activeMultiplier = {
     active: false,
-    turns: 0
+    turns: 0,
+    value: 2
 };
 let playerJokers = [];
 let historyState = null;
@@ -439,6 +445,9 @@ function loadAndResumeGame() {
         currentPiecesData = parsed.currentPiecesData;
         playerKeys = parsed.playerKeys;
         activeMultiplier = parsed.activeMultiplier;
+        if (!activeMultiplier.value) {
+            activeMultiplier.value = window.getMultValue ? window.getMultValue(gameState.chestOddsLevel) : 2;
+        }
         playerJokers = parsed.playerJokers;
         historyState = parsed.historyState;
         activeJokerMode = parsed.activeJokerMode;
@@ -861,7 +870,7 @@ document.addEventListener('pointerup', (e) => {
                 // Puan = Parça Sayısı * Blok Başı Skor * Combo Çarpanı
                 let placementPoints = blockCount * gameState.baseBlockScore * combo;
                 if (activeMultiplier.active && activeMultiplier.turns > 0) {
-                    placementPoints *= 5; // Varsa aktif x5 çarpanı
+                    placementPoints *= activeMultiplier.value; 
                 }
 
                 placePiece(dragInfo.shape, r, c, dragInfo.color, dragInfo.hasSpecial, dragInfo.specialType, dragInfo.specialPos, dragInfo.hasKey, dragInfo.keyPos);
@@ -1209,7 +1218,7 @@ function updateComboUI(isBreak=false) {
     let isMultActive = activeMultiplier.active && activeMultiplier.turns > 0;
     
     // Çarpan aktifse ekranda görünen kombo değerini 5 ile çarp
-    let displayCombo = isMultActive ? (combo * 5) : combo;
+    let displayCombo = isMultActive ? (combo * activeMultiplier.value) : combo;
 
     // Kırılma (Break) Efekti: Sadece gerçek combo 1'e düştüğünde ve isBreak true ise
     if (isBreak && combo === 1) {
@@ -1329,9 +1338,8 @@ function updateOddsUI() {
     document.getElementById('odd-pts2').innerText = `%${15 - u}`;
     document.getElementById('odd-pts3').innerText = `%${10 - u}`;
     document.getElementById('odd-pts4').innerText = `%5`;
-    document.getElementById('odd-m3').innerText = `%${25 - u}`;
-    document.getElementById('odd-m5').innerText = `%10`;
-    document.getElementById('odd-joker').innerText = `%${24 + (u * 6)}`;
+    document.getElementById('odd-mult-total').innerText = `%${35 - u}`;
+    document.getElementById('odd-joker').innerText = `%15`;
     
     // 1x1 Jokeri için yüzde ihtimali geri geldi
     document.getElementById('odd-x1').innerText = `%${1 + (u * 2)}`;
@@ -1339,6 +1347,44 @@ function updateOddsUI() {
     // Yeni eklediğimiz Seviye sayacı
     if (document.getElementById('odd-level')) {
         document.getElementById('odd-level').innerText = `${gameState.chestOddsLevel} / 30`;
+    }
+    let lvl = gameState.chestOddsLevel || 0;
+    let dist = getMultTurnsDistribution(lvl);
+    let multVal = getMultValue(lvl);
+    
+    let tooltipBox = document.getElementById('odds-tooltip-box');
+    let multBarContainer = document.getElementById('mult-bar-container');
+
+    // Eğer çubuk daha önce oluşturulmadıysa DOM'a ekle
+    if (!multBarContainer && tooltipBox) {
+        multBarContainer = document.createElement('div');
+        multBarContainer.id = 'mult-bar-container';
+        multBarContainer.style.marginTop = '15px';
+        multBarContainer.style.padding = '10px';
+        multBarContainer.style.background = 'rgba(0,0,0,0.3)';
+        multBarContainer.style.borderRadius = '8px';
+        tooltipBox.appendChild(multBarContainer);
+    }
+
+    // Çubuk İçi Dağılımını Çiz
+    if (multBarContainer) {
+        multBarContainer.innerHTML = `
+            <div style="font-size: 0.9rem; color: #f1c40f; margin-bottom: 5px; text-align: center;">
+                Çarpan Gücü: <b style="font-size: 1.1rem; text-shadow: 0 0 5px #f1c40f;">x${multVal}</b>
+            </div>
+            <div style="display: flex; width: 100%; height: 14px; border-radius: 7px; overflow: hidden; background: #333; margin-bottom: 4px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
+                <div style="width: ${dist[3]}%; background: #e74c3c; transition: width 0.4s ease;" title="3 Tur"></div>
+                <div style="width: ${dist[4]}%; background: #e67e22; transition: width 0.4s ease;" title="4 Tur"></div>
+                <div style="width: ${dist[5]}%; background: #f1c40f; transition: width 0.4s ease;" title="5 Tur"></div>
+                <div style="width: ${dist[6]}%; background: #2ecc71; transition: width 0.4s ease;" title="6 Tur"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #bdc3c7; font-weight: bold;">
+                <span style="opacity: ${dist[3]>0?1:0.3}">3T</span>
+                <span style="opacity: ${dist[4]>0?1:0.3}">4T</span>
+                <span style="opacity: ${dist[5]>0?1:0.3}">5T</span>
+                <span style="opacity: ${dist[6]>0?1:0.3}">6T</span>
+            </div>
+        `;
     }
 }
 
@@ -1365,7 +1411,8 @@ function startGame() {
     playerJokers = [];
     activeMultiplier = {
         active: false,
-        turns: 0
+        turns: 0,
+	val: 2
     };
     historyState = null;
     activeJokerMode = null;
@@ -1811,7 +1858,7 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
         } else if (type === 'multX') {
             activeAnimations++;
             let baseMult = (combo < 2) ? 1.5 : combo;
-            let multVal = (activeMultiplier.active && activeMultiplier.turns > 0) ? 5 : baseMult;
+            let multVal = (activeMultiplier.active && activeMultiplier.turns > 0) ? activeMultiplier.value : baseMult;
             let flyX = document.createElement('div');
             flyX.className = 'fly-x-anim';
             flyX.innerText = `x${multVal}`;
@@ -2061,7 +2108,7 @@ function executeAreaChains(areas, chainCombo) {
                     }, 600);
                 }
                 if (earnedPoints !== 0) {
-                    if (earnedPoints > 0 && activeMultiplier.active && activeMultiplier.turns > 0) earnedPoints *= 5;
+                    if (earnedPoints > 0 && activeMultiplier.active && activeMultiplier.turns > 0) earnedPoints *= activeMultiplier.value;
                     tallyPoints(earnedPoints);
                 }
                 areas.push(...newAreas);
@@ -2114,7 +2161,7 @@ function checkBoardLogic(isFreeTurn=false, placementPoints=0) {
         let clearPts = toClear.size * gameState.baseBlockScore * mult * combo;
         
         if (activeMultiplier.active && activeMultiplier.turns > 0) {
-            clearPts *= 5;
+            clearPts *= activeMultiplier.value;
             if (!isFreeTurn) activeMultiplier.turns--;
             updateMultUI();
         }
@@ -2322,7 +2369,7 @@ function triggerGameOverSequence() {
                 
                 // 2. Aktif x5 Çarpanı Kontrolü
                 if (typeof activeMultiplier !== 'undefined' && activeMultiplier.active && activeMultiplier.turns > 0) {
-                    finalPts *= 5;
+                    finalPts *= activeMultiplier.value;
                 }
                 
                 // Skora Ekle
@@ -2637,10 +2684,34 @@ function updateChestUI() {
     for (let i = 0; i < displayKeys; i++) {
         let k = document.createElement('div');
         k.className = 'key-icon';
-        k.innerHTML = STACK_KEY_HTML;
+        k.innerHTML = '<img src="icons/key.png" style="width:100%; height:100%; object-fit:contain;">'; // STACK_KEY_HTML
         stack.appendChild(k);
     }
+    
     const btn = document.getElementById('chest-btn');
+    
+    // --- YENİ: SANDIK SEVİYESİNE GÖRE GÖRSEL DEĞİŞİMİ ---
+    let lvl = gameState.chestOddsLevel || 0;
+    let chestImg = 'chest1'; // Varsayılan: 0-4 arası
+    if (lvl >= 30) chestImg = 'chestmax';
+    else if (lvl >= 25) chestImg = 'chest6';
+    else if (lvl >= 20) chestImg = 'chest5';
+    else if (lvl >= 15) chestImg = 'chest4';
+    else if (lvl >= 10) chestImg = 'chest3';
+    else if (lvl >= 5)  chestImg = 'chest2';
+
+    // Butonun içindeki img veya background'u güncelle
+    let btnImg = btn.querySelector('img');
+    if (btnImg) {
+        btnImg.src = `icons/${chestImg}.png`;
+    } else {
+        btn.style.backgroundImage = `url('icons/${chestImg}.png')`;
+        btn.style.backgroundSize = 'contain';
+        btn.style.backgroundRepeat = 'no-repeat';
+        btn.style.backgroundPosition = 'center';
+    }
+    // ---------------------------------------------------
+
     if (playerKeys >= 5) {
         btn.classList.add('ready', 'mega');
     } else if (playerKeys > 0) {
@@ -2711,7 +2782,7 @@ function openMegaChest() {
         val: maxPts
     }, {
         type: 'mult',
-        val: 5
+        val: rollMultTurns(gameState.chestOddsLevel)
     }, guaranteedJoker].forEach((l, idx) => popOutLoot(l, idx * 600));
 
     // YENİ: Ganimetlerden hemen sonra (yaklaşık 1.8 saniye sonra) rastgele bloğu dönüştür!
@@ -2886,7 +2957,7 @@ function popOutLoot(loot, delay) {
                                         activeAnimations++;
                                         let flyX = document.createElement('div');
                                         flyX.className = 'fly-x-anim';
-                                        flyX.innerText = `x5`;
+                                        flyX.innerText = `x${activeMultiplier.value}`;
                                         flyX.style.left = (targetRect.left + 40) + 'px';
                                         flyX.style.top = (targetRect.top - 40) + 'px';
                                         document.body.appendChild(flyX);
@@ -2898,7 +2969,7 @@ function popOutLoot(loot, delay) {
                                         setTimeout( () => {
                                             if (flyX.parentNode)
                                                 flyX.remove();
-                                            tallyPoints(finalPts * 5);
+                                            tallyPoints(finalPts * activeMultiplier.value);
                                             activeAnimations--;
                                             finalizeTurn();
                                         }
@@ -2907,11 +2978,21 @@ function popOutLoot(loot, delay) {
                                         tallyPoints(finalPts);
                                     }
                                 } else if (loot.type === 'mult') {
-                                    if (activeMultiplier.active)
+                                    let newMultValue = getMultValue(gameState.chestOddsLevel);
+
+                                    if (activeMultiplier.active && activeMultiplier.turns > 0) {
+                                        // 1. KURAL: Tur sayısını her halükarda üzerine ekle
                                         activeMultiplier.turns += loot.val;
-                                    else {
+                                        
+                                        // 2. KURAL: Yeni çarpan seviyesi eskisinden yüksekse onu al, düşük/eşitse eskisi kalsın!
+                                        if (newMultValue > activeMultiplier.value) {
+                                            activeMultiplier.value = newMultValue;
+                                        }
+                                    } else {
+                                        // Çarpan aktif değilse sıfırdan kur
                                         activeMultiplier.active = true;
                                         activeMultiplier.turns = loot.val;
+                                        activeMultiplier.value = newMultValue;
                                     }
                                     updateMultUI();
 if (typeof updateComboUI === 'function') {
@@ -3113,7 +3194,7 @@ function activateJoker(idx) {
         
         let finalPts = j.amount * combo;
 	if (activeMultiplier.active && activeMultiplier.turns > 0) {
-            finalPts *= 5;
+            finalPts *= activeMultiplier.value;
 	}
         let slotEl = document.getElementById(`jk-${idx}`);
         
