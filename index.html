@@ -17,7 +17,7 @@
 <body>
     <div id="rotate-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#111; z-index:99999; flex-direction:column; justify-content:center; align-items:center; gap:15px;">
     <div style="font-size:3rem;">🔄</div>
-    <div style="color:white; font-weight:bold; font-size:1.1rem; text-align:center; padding:0 20px;">Please rotate your device to portrait mode</div>
+    <div style="color:white; font-weight:bold; font-size:1.1rem; text-align:center; padding:0 20px;" data-i18n="rotate_device">Please rotate your device to portrait mode</div>
 </div>
     <div id="bg-blocks-container"></div>
     <div id="agro-multiplier"></div>
@@ -92,10 +92,9 @@
     <p><span><span data-i18n="odds_pts"></span> <span id="label-pts4">1500</span>:</span> <span id="odd-pts4">%5</span></p>
     
     <!-- Altında Combo ve Joker oranları varsa onları da aynı mantıkla gruplayabilirsin -->
-    <p><span>Combo x3:</span> <span id="odd-m3">%25</span></p>
-    <p><span>Combo x5:</span> <span id="odd-m5">%10</span></p>
+    <p><span><span data-i18n="odds_multiplier">Çarpan Çıkma Oranı</span>:</span> <span id="odd-mult-total">%35</span></p>
     <p><span><span data-i18n="odds_joker"></span>:</span> <span id="odd-joker">%24</span></p>
-    <p><span>1x1 Blok:</span> <span id="odd-x1">%1</span></p>
+    <p><span><span data-i18n="odds_1x1">1x1 Blok</span>:</span> <span id="odd-x1">%1</span></p>
     <p><span><span data-i18n="odds_upg"></span>:</span> <span id="odd-level">0 / 30</span></p>
 </div>
 <div id="mult-info" class="mult-text" style="opacity:0;"><span data-i18n="agro_multiplier"></span> (<span id="mult-turns"> 0</span>)</div>
