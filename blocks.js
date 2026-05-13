@@ -5,13 +5,13 @@ function rollSpecialItem() {
     let roll = Math.random() * 100;
     let level = Math.min(10, Math.floor(score / 10000));
     if (roll < 2) return 'minus'; roll -= 2;
-    if (roll < 2.2 && gameState.chestOddsLevel < 30) return 'upg'; roll -= 2.2;
+    if (roll < 2.35 && gameState.chestOddsLevel < 30) return 'upg'; roll -= 2.35;
     if (roll < 0.8 && gameState.baseBlockScore < 50) return 'scoreUp'; roll -= 0.8;
     if (roll < 0.45 && gameState.baseBlockScore > 1) return 'scoreDown'; roll -= 0.45;
     if (roll < 0.5) return 'cursedKey'; roll -= 0.5;
     if (roll < 0.25) return 'life'; roll -= 0.25;
     if (roll < 0.2 && score > 20000) return 'skull'; roll -= 0.2;
-    if (roll < 0.05 && level >= 1) return 'multX'; roll -= 0.05;
+    if (roll < 0.04 && level >= 1) return 'multX'; roll -= 0.04;
     if (roll < 2.2) return '+'; roll -= 2.2;
     if (roll < 2.7) return 'row'; roll -= 2.7;
     if (roll < 2.7) return 'col'; roll -= 2.7;
@@ -92,26 +92,31 @@ function getLootTable() {
     
     let pts250_weight = 30 - u, pts500_weight = 20 - u, pts1000_weight = 10 - u, pts1500_weight = 5;
     let m3 = 12 - u, m5 = 8;
-    let shuf = 8 + (u*2), ham = 8 + (u*2), undo = 8 + (u*2), x1 = 1 + (u*2);
-    let bun = 5 + (u*2);
+    let m_total = m3 + m5;
+    let shuf = 8, ham = 8, undo = 8, x1 = 1;
+    let bun = 5;
     
     return [
         { type: 'pts', val: CHEST_TIERS[shift], weight: pts250_weight }, 
         { type: 'pts', val: CHEST_TIERS[shift + 1], weight: pts500_weight }, 
         { type: 'pts', val: CHEST_TIERS[shift + 2], weight: pts1000_weight }, 
         { type: 'pts', val: CHEST_TIERS[shift + 3], weight: pts1500_weight },
-        { type: 'mult', val: 3, weight: m3 }, { type: 'mult', val: 5, weight: m5 },
+        { type: 'mult', val: 'dynamic', weight: m_total },
         { type: 'joker', val: 'shuffle', weight: shuf }, { type: 'joker', val: 'hammer', weight: ham }, { type: 'joker', val: 'undo', weight: undo }, { type: 'joker', val: '1x1', weight: x1 }, { type: 'joker', val: 'bundle', weight: bun }
     ];
 }
 // ÇEVİRİ MOTORUNA BAĞLANMIŞ SANDIK GANİMET YAZILARI
 function getLootData(loot) {
     let ptsText = typeof t === 'function' ? t('loot_pts') : "Puan";
-    let multText = typeof t === 'function' ? t('loot_mult') : "x5 Çarpan";
+    let multText = typeof t === 'function' ? t('loot_mult') : "x${currentMultVal} Çarpan";
     let turnsText = typeof t === 'function' ? t('loot_turns') : "Tur";
 
     if (loot.type === 'pts') return { iconPath: 'icons/pts.png', emoji: '💎', text: `+${loot.val} ${ptsText}` };
-    if (loot.type === 'mult') return { iconPath: 'icons/mult.png', emoji: '🔥', text: `${multText} (${loot.val} ${turnsText})` };
+    if (loot.type === 'mult') {
+        // GÜNCEL ÇARPAN DEĞERİNİ BURADA ÇEKİYORUZ:
+        let currentMultVal = typeof window.getMultValue === 'function' ? window.getMultValue(gameState.chestOddsLevel) : 5;
+        return { iconPath: 'icons/mult.png', emoji: '🔥', text: `x${currentMultVal} ${multText} (${loot.val} ${turnsText})` };
+    }
     
     // Jokerlerin isimlerini sözlükteki açıklamaların ":" öncesi kısmını alarak bulur. (Örn: "Çekiç Jokeri: ..." -> "Çekiç Jokeri")
     let getJokerName = (key, fallback) => {
@@ -137,10 +142,18 @@ function rollLoot() {
         table = table.filter(i => i.type !== 'joker'); 
         table[0].weight += 10; table[1].weight += 10; table[2].weight += 5; 
     }
+    
     let sum = table.reduce((a, b) => a + b.weight, 0); 
     let r = Math.random() * sum;
+    
     for (let item of table) { 
-        if (r < item.weight) return item; 
+        // EKSİK OLAN KONTROL BURASIYDI:
+        if (r < item.weight) {
+            if (item.type === 'mult' && item.val === 'dynamic') {
+                item.val = window.rollMultTurns ? window.rollMultTurns(gameState.chestOddsLevel) : 3;
+            }
+            return item; // Ganimeti burada döndürüyoruz
+        }
         r -= item.weight; 
     } 
     return table[0];
