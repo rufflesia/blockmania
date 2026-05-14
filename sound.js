@@ -170,6 +170,10 @@ function load(name) {
         applyVolumes,
         resumeBg,
         stopBg,
+        
+        playCustom(name, rate = 1.0) {
+            play(name, { volume: 1.0, rate: rate });
+        },
 
         place() { 
             const randomIndex = Math.floor(Math.random() * 5) + 1; 
