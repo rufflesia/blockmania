@@ -38,11 +38,11 @@ window.SFX = (function () {
         "place3": 1,
         "place4": 1,
         "place5": 1,
-        "combo1": 0.31,
-        "combo2": 0.27,
-        "combo3": 0.28,
-        "combo4": 0.26, 
-        "combo5": 0.28,
+        "combo1": 0.21,
+        "combo2": 0.17,
+        "combo3": 0.17,
+        "combo4": 0.16,
+        "combo5": 0.18,
         "add_score": 0.05,
         "add_bundle": 0.67
     };
