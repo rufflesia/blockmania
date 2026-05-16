@@ -5,7 +5,7 @@ function rollSpecialItem() {
     let roll = Math.random() * 100;
     let level = Math.min(10, Math.floor(score / 10000));
     if (roll < 2) return 'minus'; roll -= 2;
-    if (roll < 2.35 && gameState.chestOddsLevel < 30) return 'upg'; roll -= 2.35;
+    if (roll < 2.45 && gameState.chestOddsLevel < 30) return 'upg'; roll -= 2.45;
     if (roll < 0.8 && gameState.baseBlockScore < 50) return 'scoreUp'; roll -= 0.8;
     if (roll < 0.45 && gameState.baseBlockScore > 1) return 'scoreDown'; roll -= 0.45;
     if (roll < 0.5) return 'cursedKey'; roll -= 0.5;
@@ -94,7 +94,7 @@ function getLootTable() {
     let m3 = 12 - u, m5 = 8;
     let m_total = m3 + m5;
     let shuf = 8, ham = 8, undo = 8, x1 = 1;
-    let bun = 5;
+    let bun = 6;
     
     return [
         { type: 'pts', val: CHEST_TIERS[shift], weight: pts250_weight }, 
