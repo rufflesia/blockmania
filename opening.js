@@ -1,6 +1,7 @@
 // opening.js - Ana Menü, Carousel ve Giriş Kontrolleri
 
 let carouselTimer = null;
+let fadeTimer = null;
 
 // VİTRİNDE GÖSTERİLECEK ÖĞELER
 const carouselItems = [
@@ -15,32 +16,36 @@ const carouselItems = [
     { src: 'icons/random.png', textKey: "desc_random" },
     { src: 'icons/life.png', textKey: "desc_life" },
     { src: 'icons/skull.png', textKey: "desc_skull" },
-    { src: 'icons/megachest_describe.png', textKey: "desc_megachest_describe", scale: 1.4 },
+    { src: 'icons/megachest_describe.png', textKey: "desc_megachest_describe", scale: 2.0 },
     { src: 'icons/megacombo.png', textKey: "desc_megacombo" },
     { src: 'icons/bundle1.png', textKey: "desc_bundle" },
-    { src: 'icons/multiway.png', textKey: "desc_multiway", scale: 1.8}
+    { src: 'icons/multiway.png', textKey: "desc_multiway", scale: 2.4}
 ];
 
 window.startCarousel = function() {
+    // Hem ana döngüyü hem de geçiş animasyonunu temizle (Üst üste binmeyi engeller)
     if(carouselTimer) clearTimeout(carouselTimer);
+    if(fadeTimer) clearTimeout(fadeTimer);
+
     const imgEl = document.getElementById('carousel-img');
     const textEl = document.getElementById('carousel-text');
     
     if(!imgEl || !textEl || document.getElementById('main-menu-overlay').style.opacity === '0') {
-        clearTimeout(carouselTimer);
-        return;
+        return; // Fonksiyonu terk et
     }
 
     let randomIdx = Math.floor(Math.random() * carouselItems.length);
     let item = carouselItems[randomIdx];
 
+    // Eski öğeleri yavaşça gizle
     imgEl.style.opacity = 0;
     textEl.style.opacity = 0;
 
-    setTimeout(() => {
+    // CSS'in öğeyi gizlemesi için bekle, ardından yenisini yükleyip görünür yap
+    fadeTimer = setTimeout(() => {
         let translatedText = (typeof t === 'function') ? t(item.textKey) : item.textKey;
 
-	if (item.scale) {
+        if (item.scale) {
             imgEl.style.transform = `scale(${item.scale})`;
         } else {
             imgEl.style.transform = 'scale(1)';
@@ -49,6 +54,7 @@ window.startCarousel = function() {
         textEl.innerText = translatedText;
         imgEl.src = item.src;
         
+        // Yeni içerik yüklendi, yavaşça göster
         imgEl.style.opacity = 1;
         textEl.style.opacity = 1;
 
@@ -58,9 +64,8 @@ window.startCarousel = function() {
         if(typeof isGameRunning !== 'undefined' && !isGameRunning) {
             carouselTimer = setTimeout(window.startCarousel, displayTime);
         }
-    }, 400); 
+    }, 450); // iOS'ta takılmaları önlemek için süreyi 400'den 450'ye çıkardık
 };
-
 // DOM Seçimleri (DOMContentLoaded olmadan direkt çalışır)
 const mainMenuOverlay = document.getElementById('main-menu-overlay');
 const playMainBtn = document.getElementById('play-main-btn');
