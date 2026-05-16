@@ -1597,3 +1597,7 @@ button.btn-primary:hover {
     overflow-y: visible !important; /* Kırpılmaları önler */
 }
 
+#carousel-img, #carousel-text {
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    opacity: 1;
+}
