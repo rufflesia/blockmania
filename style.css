@@ -1600,4 +1600,6 @@ button.btn-primary:hover {
 #carousel-img, #carousel-text {
     transition: opacity 0.4s ease, transform 0.4s ease;
     opacity: 1;
+    font-size: clamp(1rem, 4vw, 1.5rem); 
+    font-weight: bold;
 }
