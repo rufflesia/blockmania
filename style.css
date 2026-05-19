@@ -1604,6 +1604,6 @@ button.btn-primary:hover {
 
 /* Sadece yazıya özel tipografi ayarları */
 #carousel-text {
-    font-size: clamp(1rem, 4vw, 1.5rem); 
-    font-weight: bold;
+    font-size: clamp(0.6rem, 4vw, 1rem); !important
+    font-weight: bold; !important
 }
