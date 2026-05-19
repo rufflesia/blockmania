@@ -1,4 +1,4 @@
-const CACHE_NAME = 'BlockMania-v2.15';
+const CACHE_NAME = 'BlockMania-v2.16';
 
 // Oyunun çevrimdışı çalışabilmesi için ZORUNLU olan tüm dosyalar
 // Not: "offline.html" dosyasını da bu listeye ekledik.
