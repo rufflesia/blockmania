@@ -9,17 +9,18 @@
     'use strict';
 
     // ── CONFIG ───────────────────────────────────────────────
-    // How many background images you have (background1_mobile.png …)
-    const BG_COUNT = 3;
+    // How many background images you have (background1_mobile.png … background5_mobile.png)
+    const BG_COUNT = 5;
 
     // How long each background stays before crossfading (ms)
-    const BG_ROTATE_MS = 4000;
+    const BG_ROTATE_MS = 7000;
 
     // Crossfade duration (ms) — must match CSS transition below
-    const BG_FADE_MS = 800;
+    const BG_FADE_MS = 1500;
 
-    // All JS/CSS/asset files that must load before hiding the screen.
-    // Add or remove entries to match your actual project files.
+    // Files that block the loading screen — only what the game actually
+    // needs to open and be playable from the first move. Add or remove
+    // entries to match your actual project files.
     const ASSETS = [
         'style.css',
         'shapes.js',
@@ -28,7 +29,10 @@
         'game.js',
         'tutorial.js',
         'dictionary.json',
+
         'icons/chest.png',
+        'icons/chest1.png',
+
         'icons/key.png',
         'icons/key_block.png',
         'icons/hammer.png',
@@ -52,26 +56,47 @@
         'icons/cursedKey.png',
         'icons/minus.png',
         'icons/hammer_icon.png',
-	'icons/bundle1.png',
+        'icons/bundle1.png',
         'icons/bundle2.png',
         'icons/bundle3.png',
         'icons/bundle4.png',
-        'assets/crack.png',
+        'icons/ice.png',
+        'icons/megachest_describe.png',
+        'icons/megacombo.png',
+        'icons/multiway.png',
+
         'blockmania.png',
     ];
 
+    // Files that are only needed once the player actually reaches that
+    // part of the game (high chest tiers, hammer crack effect, ice-break
+    // clip) — these load quietly in the background AFTER the loading
+    // screen is gone, instead of holding up the player's first move.
+    const DEFERRED_ASSETS = [
+        'icons/chest2.png',
+        'icons/chest3.png',
+        'icons/chest4.png',
+        'icons/chest5.png',
+        'icons/chest6.png',
+        'icons/chestmax.png',
+        'assets/crack.png',
+        'assets/ice_break.gif',
+    ];
+
     // ── STATE ────────────────────────────────────────────────
-    let loaded      = 0;
-    let total       = ASSETS.length;
-    let bgIndex     = 0;
-    let bgTimer     = null;
-    let screen      = null;   // the overlay element
-    let bar         = null;   // the inner progress bar element
-    let pctEl       = null;   // percentage text
-    let bgA         = null;   // layer A
-    let bgB         = null;   // layer B
-    let activeBg    = 'A';    // which layer is currently visible
-    let dismissed   = false;
+    let loaded       = 0;
+    let total        = ASSETS.length;
+    let bgIndex      = 0;
+    let bgTimer      = null;
+    let screen       = null;   // the overlay element
+    let bar          = null;   // the inner progress bar element
+    let pctEl        = null;   // percentage text
+    let bgA          = null;   // layer A
+    let bgB          = null;   // layer B
+    let activeBg     = 'A';    // which layer is currently visible
+    let dismissed    = false;
+    let dictReady    = false;
+    let introReady   = false;
 
     // ── BUILD DOM ────────────────────────────────────────────
     function build() {
@@ -81,7 +106,7 @@
                 position: fixed;
                 inset: 0;
                 z-index: 99999;
-		background-color: #12141a;
+                background-color: #12141a;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
@@ -126,8 +151,6 @@
                 align-items: center;
                 gap: 14px;
             }
-
-            
 
             #bm-loading-label {
                 color: rgba(255,255,255,0.75);
@@ -201,8 +224,6 @@
         const content = document.createElement('div');
         content.id = 'bm-loading-content';
 
-       
-
         // Label
         const label = document.createElement('div');
         label.id = 'bm-loading-label';
@@ -220,7 +241,6 @@
         pctEl.id = 'bm-pct';
         pctEl.innerText = '0%';
 
-       
         content.appendChild(label);
         content.appendChild(track);
         content.appendChild(pctEl);
@@ -230,11 +250,15 @@
     }
 
     // ── BACKGROUND ROTATION ───────────────────────────────────
+    function bgVariant() {
+        // Pick mobile or PC variant based on orientation — decided once,
+        // since this also determines which files are actually worth
+        // fetching at all (no point ever downloading the other variant).
+        return (window.innerWidth < window.innerHeight) ? 'mobile' : 'pc';
+    }
+
     function getBgSrc(index) {
-        // Pick mobile or PC variant based on orientation
-        const isMobile = window.innerWidth < window.innerHeight;
-        const variant  = isMobile ? 'mobile' : 'pc';
-        return `backgrounds/background${index}_${variant}.png`;
+        return `backgrounds/background${index}_${bgVariant()}.png`;
     }
 
     function setInitialBg() {
@@ -288,12 +312,29 @@
         const pct = Math.min(100, Math.round((loaded / total) * 100));
         bar.style.width   = pct + '%';
         pctEl.innerText   = pct + '%';
+        maybeHide();
+    }
 
-        if (loaded >= total) {
-            // Give a tiny breath then hide
+    // Only safe to dismiss once every tracked critical asset has
+    // downloaded, game.js has signaled that its own dictionary fetch +
+    // initial translation pass is done, AND game.js's window.onload
+    // handler has finished building the visible intro UI — otherwise the
+    // screen could disappear while the game is still finishing its own
+    // async startup, leaving a blank gap behind it.
+    function maybeHide() {
+        if (loaded >= total && dictReady && introReady) {
             setTimeout(hide, 300);
         }
     }
+
+    window.__bmDictReady = function () {
+        dictReady = true;
+        maybeHide();
+    };
+    window.__bmIntroReady = function () {
+        introReady = true;
+        maybeHide();
+    };
 
     function hide() {
         if (dismissed) return;
@@ -303,17 +344,50 @@
         setTimeout(() => {
             if (screen.parentNode) screen.remove();
         }, 550);
+
+        // Only now, once the player can actually see and play the game,
+        // quietly fetch the assets that aren't needed immediately.
+        loadDeferredAssets();
     }
 
     // ── ASSET LOADING ─────────────────────────────────────────
-    // Preload all background images (they don't count toward the bar)
+    // Preload only the background variant this device will actually show
+    // (they don't count toward the bar). Staggered so five images don't
+    // all fight the critical assets for the same handful of connections
+    // right at page start — each one only needs to be ready shortly
+    // before its turn in the rotation, not immediately.
     function preloadBgs() {
+        const variant = bgVariant();
         for (let i = 1; i <= BG_COUNT; i++) {
-            ['mobile', 'pc'].forEach(v => {
+            const delay = i * 1200;
+            setTimeout(() => {
                 const img = new Image();
-                img.src = `backgrounds/background${i}_${v}.png`;
-            });
+                img.src = `backgrounds/background${i}_${variant}.png`;
+            }, delay);
         }
+    }
+
+    // Fire-and-forget loader for assets that don't block anything and
+    // aren't tracked by the progress bar.
+    function loadAssetQuiet(src) {
+        if (src.endsWith('.gif') || src.endsWith('.png') || src.endsWith('.jpg')) {
+            const img = new Image();
+            img.src = src;
+        } else {
+            fetch(src).catch(() => {});
+        }
+    }
+
+    function loadDeferredAssets() {
+        const CONCURRENCY = 2;
+        let cursor = 0;
+        function next() {
+            if (cursor >= DEFERRED_ASSETS.length) return;
+            const src = DEFERRED_ASSETS[cursor++];
+            loadAssetQuiet(src);
+            setTimeout(next, 150);
+        }
+        for (let i = 0; i < CONCURRENCY; i++) next();
     }
 
     function loadAsset(src) {
@@ -354,7 +428,7 @@
         // Start bg rotation after first display
         bgTimer = setTimeout(rotateBg, BG_ROTATE_MS);
 
-        // Load all assets sequentially in groups of 4 (parallel but controlled)
+        // Load all critical assets in groups of 4 (parallel but controlled)
         const CONCURRENCY = 4;
         let cursor = 0;
 
