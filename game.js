@@ -47,9 +47,11 @@ fetch('dictionary.json')
         i18n = data;
         isDictLoaded = true;
         applyTranslations(); // Yüklendiği an ekrandaki etiketleri hemen çevir
+        if (typeof window.__bmDictReady === 'function') window.__bmDictReady();
     })
     .catch(err => {
         console.error("Sözlük yüklenemedi! Projeyi Live Server ile çalıştırdığından emin ol.", err);
+        if (typeof window.__bmDictReady === 'function') window.__bmDictReady();
     });
 
 // 2. Çeviri Fonksiyonu (JSON yüklenene kadar anahtarları gösterir)
@@ -172,7 +174,7 @@ window.rollMultTurns = function(level) {
 };
 
 // Puanların ana skordan ziyade keseye uçmasını sağlayan sistem
-window.flyPointsToPouch = function(pts, targetEl) {
+window.flyPointsToPouch = function(pts, targetEl, sourceRect = null) {
     const f = document.createElement('div');
     f.className = 'floating-score collecting';
     f.innerText = `+${pts}`;
@@ -187,7 +189,24 @@ window.flyPointsToPouch = function(pts, targetEl) {
     f.style.left = `${rect.right + window.scrollX + 7}px`; 
     f.style.top = `${rect.top + window.scrollY}px`; 
     document.body.appendChild(f);
+    let startX, startY;
+
+    if (sourceRect) {
+        // SMOOTH GEÇİŞ: Tally skorunun tam merkez koordinatlarını alıyoruz!
+        startX = sourceRect.left + (sourceRect.width / 2) + window.scrollX;
+        startY = sourceRect.top + (sourceRect.height / 2) + window.scrollY;
+        f.style.transform = 'translate(-50%, -50%) scale(1)'; 
+    } else {
+        // Eski Klasik Doğuş Noktası
+        const mainScore = document.getElementById('score');
+        const rect = mainScore.getBoundingClientRect();
+        startX = rect.right + 7 + window.scrollX;
+        startY = rect.top + window.scrollY;
+        f.style.transform = 'scale(1)'; 
+    }
     
+    f.style.left = `${startX}px`; 
+    f.style.top = `${startY}px`;
     setTimeout(() => {
         f.classList.remove('collecting');
         f.classList.add('flying');
@@ -195,7 +214,7 @@ window.flyPointsToPouch = function(pts, targetEl) {
         const tRect = targetEl.getBoundingClientRect();
         const distX = tRect.left + (tRect.width/2) - (rect.right + 7);
         const distY = tRect.top + (tRect.height/2) - rect.top;
-        f.style.transform = `translate(${distX}px, ${distY}px) scale(0.3)`;
+        f.style.transform = sourceRect ? `translate(calc(-50% + ${distX}px), calc(-50% + ${distY}px)) scale(0.3)` : `translate(${distX}px, ${distY}px) scale(0.3)`;
         f.style.opacity = '0';
         setTimeout(() => {
             if (f.parentNode) f.remove();
@@ -203,7 +222,7 @@ window.flyPointsToPouch = function(pts, targetEl) {
 	    if (typeof window.playDynamicSound === 'function') window.playDynamicSound('bundle', pts);
             setTimeout(() => targetEl.classList.remove('chest-pop-anim'), 300);
         }, 400);
-    }, 300);
+    }, 200);
 };
 
 // Keseyi patlatınca içinden çıkan devasa sarı puanların skora uçması
@@ -247,6 +266,7 @@ window.tallyBundlePoints = function(pts, sourceEl) {
 
 const boardSize = 9;
 let boardState = [];
+let iceState = [];
 let score = 0
   , rawScore = 0
   , combo = 1;
@@ -263,8 +283,8 @@ let dragInfo = {
     hasSpecial: false,
     specialType: null,
     specialPos: null,
-    hasKey: false,
-    keyPos: null
+    keyPositions: [],
+    icePositions: []
 };
 let playerKeys = 0;
 let activeMultiplier = {
@@ -308,6 +328,10 @@ let stats = {
 };
 let turnClearedBlocks = 0;
 let turnPoints = 0;
+let turnChainAreas = 0;
+let turnMultiClear = 0;
+let jokerUsedThisTurn = false;
+let activePraiseEl = null; // Yazıların üst üste binmesini engelleyecek kilit
 let topScores = [];
 const STORAGE_KEY = 'blockudoku_save_vFinal';
 const SCORES_KEY = 'blockudoku_scores_vFinal';
@@ -351,23 +375,29 @@ setInterval( () => {
 , 15000);
 
 if (infoBtnEl && oddsTooltipBox) {
-    // 1. Sadece fare ile üzerine gelince (PC)
-    infoBtnEl.addEventListener('mouseenter', () => {
-        oddsTooltipBox.classList.add('show');
-        infoBtnEl.classList.remove('upgrade-notification');
+    // 1. Sadece GERÇEK BİR FARE (PC) ile üzerine gelindiğinde çalışsın
+    infoBtnEl.addEventListener('pointerenter', (e) => {
+        // pointerType kontrolü sayesinde dokunmatik ekranların sahte hover'ı engellenir
+        if (e.pointerType === 'mouse') {
+            oddsTooltipBox.classList.add('show');
+            infoBtnEl.classList.remove('upgrade-notification');
+        }
     });
-    infoBtnEl.addEventListener('mouseleave', () => {
-        oddsTooltipBox.classList.remove('show');
+    
+    infoBtnEl.addEventListener('pointerleave', (e) => {
+        if (e.pointerType === 'mouse') {
+            oddsTooltipBox.classList.remove('show');
+        }
     });
 
-    // 2. Sadece dokunma/tıklama ile (Mobil)
+    // 2. Dokunma ve Tıklama (Mobil odaklıdır, PC'de de çalışır)
     infoBtnEl.addEventListener('click', (e) => {
         e.preventDefault();
         oddsTooltipBox.classList.toggle('show');
         infoBtnEl.classList.remove('upgrade-notification');
     });
 
-    // 3. Dışarı tıklayınca kapatma
+    // 3. Dışarı tıklayınca/dokununca kapatma
     document.addEventListener('click', (e) => {
         if (!infoBtnEl.contains(e.target) && !oddsTooltipBox.contains(e.target)) {
             oddsTooltipBox.classList.remove('show');
@@ -412,6 +442,7 @@ function saveGameState() {
         return;
     let state = {
         boardState,
+        iceState,
         score,
         rawScore,
         combo,
@@ -439,10 +470,24 @@ function loadAndResumeGame() {
     if (s) {
         let parsed = JSON.parse(s);
         boardState = parsed.boardState;
+        iceState = parsed.iceState || Array(boardSize).fill().map( () => Array(boardSize).fill(false));
         score = parsed.score;
         rawScore = parsed.rawScore || 0;
         combo = parsed.combo;
         currentPiecesData = parsed.currentPiecesData;
+	currentPiecesData.forEach(p => {
+            if (p.hasKey !== undefined) {
+                if (p.hasKey && p.keyPos) p.keyPositions = [p.keyPos];
+                else p.keyPositions = [];
+                delete p.hasKey;
+                delete p.keyPos;
+            } else if (!p.keyPositions) {
+                p.keyPositions = [];
+            }
+            if (!p.icePositions) {
+                p.icePositions = [];
+            }
+        });
         playerKeys = parsed.playerKeys;
         activeMultiplier = parsed.activeMultiplier;
         if (!activeMultiplier.value) {
@@ -482,12 +527,24 @@ function loadAndResumeGame() {
 function finalizeTurn() {
     if (activeAnimations <= 0) {
         activeAnimations = 0;
+
+        // --- AKILLI ŞAŞIRMA SİSTEMİNİ TETİKLE ---
+        if (turnPoints > 0 || turnChainAreas > 1 || turnMultiClear > 1) {
+            evaluateAndShowPraise();
+        }
+
         if (turnPoints > stats.maxPointsInMove)
             stats.maxPointsInMove = turnPoints;
         if (turnClearedBlocks > stats.maxBlocksInMove)
             stats.maxBlocksInMove = turnClearedBlocks;
+        
+        // Hamle bitti, sayaçları sıfırla!
         turnPoints = 0;
         turnClearedBlocks = 0;
+        turnChainAreas = 0;
+        turnMultiClear = 0;
+	jokerUsedThisTurn = false;
+
         updateTrayPiecesState();
         if (isGameRunning && !isGameOverSequence)
             saveGameState();
@@ -593,9 +650,14 @@ startDragWrapper.addEventListener('pointerdown', (e) => {
     clearInterval(idleInterval);
     startDragWrapper.classList.add('dragging');
     const rect = startDragWrapper.getBoundingClientRect();
+    const bRect = boardEl.getBoundingClientRect();
+    const cW = bRect.width / 9;
+    const startCell = startDragWrapper.querySelector('.piece-cell');
+    const currentCellWidth = startCell ? startCell.offsetWidth : 24;
     startDragInfo = {
         startX: rect.left + rect.width / 2,
-        startY: rect.top + rect.height / 2
+        startY: rect.top + rect.height / 2,
+        scaleRatio: cW / currentCellWidth
     };
     drawStartHoleBoard();
 }
@@ -621,26 +683,148 @@ function drawStartHoleBoard() {
 
 document.addEventListener('pointermove', (e) => {
     if (isStartDragging) {
-        const bRect = boardEl.getBoundingClientRect();
-        
-        // KUSURSUZ ÖLÇEK MATEMATİĞİ: 
-        // Board'daki gerçek bir hücrenin o anki pikselini okuyoruz.
-        const targetCell = boardEl.children[0];
-        const targetCellWidth = targetCell ? targetCell.offsetWidth : (bRect.width / 9);
-        
-        // Başlangıç bloğunun CSS'teki boyutu 25px'tir. Gerçek hücreyi 25'e bölersek altın oranı buluruz.
-        const scaleRatio = targetCellWidth / 25; 
-        
         const isTouch = e.pointerType === 'touch' || window.innerWidth <= 768;
-        const yOffset = isTouch ? -60 : 0; // Taşmayı önlemek için -60 yerine -50 yaptık
-        
+        const yOffset = isTouch ? -60 : 0;
         const dx = e.clientX - startDragInfo.startX;
         const dy = e.clientY - startDragInfo.startY + yOffset;
-      
-        startDragWrapper.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleRatio.toFixed(2)})`;
+        startDragWrapper.style.transform = `translate(${dx}px, ${dy}px) scale(${startDragInfo.scaleRatio.toFixed(2)})`;
+        return; 
+    }
+    
+    if (draggingElement) {
+        clearTooltip();
+        
+        const isTouch = e.pointerType === 'touch' || window.innerWidth <= 768;
+        const yOffset = isTouch ? -60 : 0;
+        
+        const dx = e.clientX - dragInfo.startX;
+        const dy = e.clientY - dragInfo.startY + yOffset;
+        
+        // DOM OKUMADAN (%100 Matematik ile) fRect'in CSS ile ölçeklenmiş yeni merkezini hesaplıyoruz! 
+        const ptX = (dragInfo.startX + dx) + (dragInfo.initialPtX - dragInfo.startX) * dragInfo.scaleRatio;
+        const ptY = (dragInfo.startY + dy) + (dragInfo.initialPtY - dragInfo.startY) * dragInfo.scaleRatio;
+        
+        const bRect = dragInfo.boardRect;
+        const cW = dragInfo.cellWidth;
+        const cH = dragInfo.cellHeight;
+        
+        // RENDER işlemini rAF ile ekran kartının yenileme hızına kilitliyoruz (60+ FPS)
+        if (!draggingElement.isAnimating) {
+            draggingElement.isAnimating = true;
+            
+            // O anki bloğun referansını kopyalıyoruz (Race Condition Güvenliği)
+            const currentEl = draggingElement; 
+            
+            requestAnimationFrame(() => {
+                // Havadayken parmak çekildiyse işlemi iptal et
+                if (!currentEl || !currentEl.classList.contains('dragging')) {
+                    if (currentEl) currentEl.isAnimating = false;
+                    return;
+                }
+                
+                currentEl.style.transform = `translate(${dx}px, ${dy}px) scale(${dragInfo.scaleRatio.toFixed(2)})`;
+		// --- SÜRÜKLEME PARTİKÜL SİSTEMİ BAŞLANGICI ---
+                if (dragInfo.icePositions && dragInfo.icePositions.length > 0) {
+                    // Objeye uygulanan mevcut offset (-60 vb) zaten dy'nin içinde. 
+                    // Buna rağmen parmak kapatmasın diye Y ekseninden ekstra biraz daha yukarı alıyoruz (-25).
+                    const wrapperCenterX = dragInfo.startX + dx;
+                    const wrapperCenterY = dragInfo.startY + dy - 25; 
+
+                    // Grid'in tam boyutunu hesaplayıp merkeze olan uzaklığını buluyoruz (0 reflow!)
+                    const gridW = dragInfo.shape[0].length * 24 - 2;
+                    const gridH = dragInfo.shape.length * 24 - 2;
+                    const gridOffsetX = -gridW / 2;
+                    const gridOffsetY = -gridH / 2;
+
+                    // Her karede yüzlerce üretmemesi için ufak bir şans (30%)
+                    if (Math.random() < 0.3) {
+                        dragInfo.icePositions.forEach(icePos => {
+                            // Buz hücresinin scale edilmiş net ekran koordinatı
+                            const iceX = wrapperCenterX + (gridOffsetX + icePos.c * 24 + 11) * dragInfo.scaleRatio;
+                            const iceY = wrapperCenterY + (gridOffsetY + icePos.r * 24 + 11) * dragInfo.scaleRatio;
+                            
+                            if (typeof window.spawnIceParticle === 'function') {
+                                window.spawnIceParticle(iceX, iceY, 'trail');
+                            }
+                        });
+                    }
+                }
+                // --- SÜRÜKLEME PARTİKÜL SİSTEMİ SONU ---
+                
+                if (ptX >= bRect.left && ptX <= bRect.right && ptY >= bRect.top && ptY <= bRect.bottom) {
+                    let originC = Math.floor((ptX - bRect.left) / cW);
+                    let originR = Math.floor((ptY - bRect.top) / cH);
+                    if (!dragInfo.currentOrigin || dragInfo.currentOrigin.r !== originR || dragInfo.currentOrigin.c !== originC) {
+                        dragInfo.currentOrigin = { r: originR, c: originC };
+                        showGhostAndPredict(originR, originC);
+                    }
+                } else {
+                    dragInfo.currentOrigin = null;
+                    clearGhost();
+                }
+                
+                currentEl.isAnimating = false;
+            });
+        }
+        return;
+    }
+
+    if (pendingJokerDrag) {
+        let dx = e.clientX - pendingJokerDrag.startX;
+        let dy = e.clientY - pendingJokerDrag.startY;
+        if (Math.hypot(dx, dy) > 10) {
+            let data = pendingJokerDrag.data;
+            let idx = pendingJokerDrag.index;
+            pendingJokerDrag = null;
+            jokerPressIsLong = true;
+            if (data.type === 'hammer' || data.type === '1x1') {
+                clearTooltip();
+                if (!isGameRunning || activeAnimations > 0) return;
+                let iconSrc = data.type === 'hammer' ? 'icons/hammer_icon.png' : 'icons/random_block.png';
+                jokerDragInfo = { index: idx, type: data.type, clone: document.createElement('div') };
+                jokerDragInfo.clone.innerHTML = `<img src="${iconSrc}" style="width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 10px 20px rgba(0,0,0,0.5));">`;
+                jokerDragInfo.clone.style.position = 'absolute';
+                jokerDragInfo.clone.style.width = '60px';
+                jokerDragInfo.clone.style.height = '60px';
+                jokerDragInfo.clone.style.zIndex = '100000';
+                jokerDragInfo.clone.style.pointerEvents = 'none';
+                document.body.appendChild(jokerDragInfo.clone);
+                jokerDragInfo.clone.style.left = (e.clientX - 30) + 'px';
+                jokerDragInfo.clone.style.top = (e.clientY - 30) + 'px';
+            }
+        }
+    }
+    
+    if (jokerDragInfo) {
+        jokerDragInfo.clone.style.left = (e.clientX - 30) + 'px';
+        jokerDragInfo.clone.style.top = (e.clientY - 30) + 'px';
+        const bRect = boardEl.getBoundingClientRect();
+        if (e.clientX >= bRect.left && e.clientX <= bRect.right && e.clientY >= bRect.top && e.clientY <= bRect.bottom) {
+            const cW = bRect.width / 9;
+            const cH = bRect.height / 9;
+            let c = Math.floor((e.clientX - bRect.left) / cW);
+            let r = Math.floor((e.clientY - bRect.top) / cH);
+            if (r >= 0 && r < 9 && c >= 0 && c < 9) {
+                clearGhost();
+                if (jokerDragInfo.type === 'hammer') {
+                    for (let i = 0; i < 2; i++)
+                        for (let j = 0; j < 2; j++)
+                            if (r + i < 9 && c + j < 9)
+                                boardEl.children[(r + i) * 9 + (c + j)].classList.add('hover-hammer');
+                } else if (jokerDragInfo.type === '1x1') {
+                    if (boardState[r][c] === 0)
+                        boardEl.children[r * 9 + c].classList.add('hover-valid');
+                    else
+                        boardEl.children[r * 9 + c].classList.add('hover-invalid');
+                }
+            } else {
+                clearGhost();
+            }
+        } else {
+            clearGhost();
+        }
     }
 });
-
 document.addEventListener('pointerup', (e) => {
     if (isStartDragging) {
         isStartDragging = false;
@@ -649,6 +833,10 @@ document.addEventListener('pointerup', (e) => {
         const centerX = bRect.left + bRect.width / 2;
         const centerY = bRect.top + bRect.height / 2;
         const dist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+        
+        const hintText = document.getElementById('drag-hint-text');
+        if(hintText) hintText.style.opacity = '1';
+
         if (dist < 70) {
             startDragWrapper.style.visibility = 'hidden';
             handleStartDrop();
@@ -656,10 +844,110 @@ document.addEventListener('pointerup', (e) => {
             startDragWrapper.style.transform = 'translate(0px, 0px) scale(1)';
             startIdleAnimation();
         }
+        return; // ÇAKIŞMAYI ÖNLEYEN YAMA
     }
-}
-);
 
+    clearTooltip();
+    if (draggingElement) {
+        draggingElement.isAnimating = false; // GÜVENLİK SIFIRLAMASI
+        let placed = false;
+        if (dragInfo.currentOrigin) {
+            const {r, c} = dragInfo.currentOrigin;
+            if (canPlace(boardState, dragInfo.shape, r, c)) {
+                saveHistory();
+                
+                let blockCount = 0;
+                for (let i = 0; i < dragInfo.shape.length; i++) {
+                    for (let j = 0; j < dragInfo.shape[0].length; j++) {
+                        if (dragInfo.shape[i][j] === 1) blockCount++;
+                    }
+                }
+                
+                let placementPoints = blockCount * gameState.baseBlockScore;
+                if (activeMultiplier.active && activeMultiplier.turns > 0) {
+                    placementPoints *= activeMultiplier.value; 
+                }
+
+                // ESKİ "hasKey, keyPos" SİLİNDİ, SADECE keyPositions GÖNDERİLİYOR
+                placePiece(dragInfo.shape, r, c, dragInfo.color, dragInfo.hasSpecial, dragInfo.specialType, dragInfo.specialPos, dragInfo.keyPositions, dragInfo.icePositions);
+                currentPiecesData[dragInfo.index].used = true;
+                placed = true;
+                totalTurns++;
+                turnClearedBlocks = 0;
+                
+                turnPoints = 0;
+                
+                checkBoardLogic(false, placementPoints);
+                updateTrayPiecesState();
+                if (currentPiecesData.every(p => p.used)) {
+                    setTimeout(() => generatePieces(), 300);
+                } else {
+                    finalizeTurn();
+                }
+            }
+        }
+        draggingElement.classList.remove('dragging');
+        if (!placed) {
+            draggingElement.style.transform = 'translate(0px, 0px) scale(1)';
+            if (dragInfo.currentOrigin) stats.invalidPlacements++;
+        } else {
+            draggingElement.style.visibility = 'hidden';
+        }
+        draggingElement = null;
+        clearGhost();
+        return;
+    }
+    
+    if (pendingJokerDrag) {
+        let idx = pendingJokerDrag.index;
+        pendingJokerDrag = null;
+        if (!jokerPressIsLong && !jokerDragInfo) {
+            activateJoker(idx);
+        }
+    }
+    
+    if (jokerDragInfo) {
+        const bRect = boardEl.getBoundingClientRect();
+        if (e.clientX >= bRect.left && e.clientX <= bRect.right && e.clientY >= bRect.top && e.clientY <= bRect.bottom) {
+            const cW = bRect.width / 9;
+            const cH = bRect.height / 9;
+            let c = Math.floor((e.clientX - bRect.left) / cW);
+            let r = Math.floor((e.clientY - bRect.top) / cH);
+            if (r >= 0 && r < 9 && c >= 0 && c < 9) {
+                activeJokerIndex = jokerDragInfo.index;
+                activeJokerMode = jokerDragInfo.type;
+                if (activeJokerMode === 'hammer') {
+                    hammerLockedPos = { r, c };
+                    clearGhost();
+                    for (let i = 0; i < 2; i++)
+                        for (let j = 0; j < 2; j++)
+                            if (r + i < 9 && c + j < 9)
+                                boardEl.children[(r + i) * 9 + (c + j)].classList.add('hover-hammer-locked');
+                } else if (activeJokerMode === '1x1') {
+                    if (boardState[r][c] === 0) {
+                        oneByOneLockedPos = { r, c };
+                        clearGhost();
+                        let cell = boardEl.children[r * 9 + c];
+                        cell.classList.add('hover-1x1-locked');
+                        cell.innerHTML = `<img src="icons/random_block.png" style="width:95%; height:95%; object-fit:contain; opacity:0.8; animation: pulse 1s infinite;" class="ghost-random">`;
+                    } else {
+                        activeJokerMode = null;
+                    }
+                }
+            } else {
+                activeJokerMode = null;
+            }
+        } else {
+            activeJokerMode = null;
+        }
+        if (jokerDragInfo.clone) jokerDragInfo.clone.remove();
+        jokerDragInfo = null;
+        if (!activeJokerMode) {
+            updateJokerUI();
+            clearGhost();
+        }
+    }
+});
 function handleStartDrop() {
     Array.from(boardEl.children).forEach(c => {
         c.classList.remove('hover-valid');
@@ -767,7 +1055,7 @@ window.playAgainDirectly = function() {
     startGame();
 };
 
-window.onload = () => {
+function bmBootInteractiveStart() {
     loadScores();
     initInteractiveStart();
     if (topScores.length > 0) {
@@ -775,8 +1063,13 @@ window.onload = () => {
         if (hsValEl)
             hsValEl.innerText = formatScore(topScores[0].score);
     }
+    if (typeof window.__bmIntroReady === 'function') window.__bmIntroReady();
 }
-;
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bmBootInteractiveStart);
+} else {
+    bmBootInteractiveStart();
+}
 
 document.addEventListener('pointerdown', (e) => {
     if (!isGameRunning || isGameOverSequence)
@@ -850,221 +1143,6 @@ if (jokerSlot && jokerSlot.classList.contains('has-item')) {
 }
 );
 
-document.addEventListener('pointerup', (e) => {
-    clearTooltip();
-    if (draggingElement) {
-        let placed = false;
-        if (dragInfo.currentOrigin) {
-            const {r, c} = dragInfo.currentOrigin;
-            if (canPlace(boardState, dragInfo.shape, r, c)) {
-                saveHistory();
-                
-                // YENİ: Parça sayısını say ve yerleştirme puanını hesapla
-                let blockCount = 0;
-                for (let i = 0; i < dragInfo.shape.length; i++) {
-                    for (let j = 0; j < dragInfo.shape[0].length; j++) {
-                        if (dragInfo.shape[i][j] === 1) blockCount++;
-                    }
-                }
-                
-                // Puan = Parça Sayısı * Blok Başı Skor * Combo Çarpanı
-                let placementPoints = blockCount * gameState.baseBlockScore * combo;
-                if (activeMultiplier.active && activeMultiplier.turns > 0) {
-                    placementPoints *= activeMultiplier.value; 
-                }
-
-                placePiece(dragInfo.shape, r, c, dragInfo.color, dragInfo.hasSpecial, dragInfo.specialType, dragInfo.specialPos, dragInfo.hasKey, dragInfo.keyPos);
-                currentPiecesData[dragInfo.index].used = true;
-                placed = true;
-                turnClearedBlocks = 0;
-                turnPoints = 0;
-                
-                // Yerleştirme puanını tahta kontrolüne gönder
-                checkBoardLogic(false, placementPoints);
-                updateTrayPiecesState();
-                if (currentPiecesData.every(p => p.used)) {
-                    setTimeout( () => {
-                        generatePieces();
-                    }
-                    , 300);
-                } else {
-                    finalizeTurn();
-                }
-            }
-        }
-        draggingElement.classList.remove('dragging');
-        if (!placed) {
-            draggingElement.style.transform = 'translate(0px, 0px) scale(1)';
-            if (dragInfo.currentOrigin)
-                stats.invalidPlacements++;
-        } else
-            draggingElement.style.visibility = 'hidden';
-        draggingElement = null;
-        clearGhost();
-        return;
-    }
-    if (pendingJokerDrag) {
-        let idx = pendingJokerDrag.index;
-        pendingJokerDrag = null;
-	        if (!jokerPressIsLong && !jokerDragInfo) {
-			
-	                activateJoker(idx);
-        }
-    }
-    if (jokerDragInfo) {
-        const bRect = boardEl.getBoundingClientRect();
-        if (e.clientX >= bRect.left && e.clientX <= bRect.right && e.clientY >= bRect.top && e.clientY <= bRect.bottom) {
-            const cW = bRect.width / 9;
-            const cH = bRect.height / 9;
-            let c = Math.floor((e.clientX - bRect.left) / cW);
-            let r = Math.floor((e.clientY - bRect.top) / cH);
-            if (r >= 0 && r < 9 && c >= 0 && c < 9) {
-                activeJokerIndex = jokerDragInfo.index;
-                activeJokerMode = jokerDragInfo.type;
-                if (activeJokerMode === 'hammer') {
-                    hammerLockedPos = {
-                        r,
-                        c
-                    };
-                    clearGhost();
-                    for (let i = 0; i < 2; i++)
-                        for (let j = 0; j < 2; j++)
-                            if (r + i < 9 && c + j < 9)
-                                boardEl.children[(r + i) * 9 + (c + j)].classList.add('hover-hammer-locked');
-                } else if (activeJokerMode === '1x1') {
-                    if (boardState[r][c] === 0) {
-                        oneByOneLockedPos = {
-                            r,
-                            c
-                        };
-                        clearGhost();
-                        let cell = boardEl.children[r * 9 + c];
-                        cell.classList.add('hover-1x1-locked');
-                        cell.innerHTML = `<img src="icons/random_block.png" style="width:95%; height:95%; object-fit:contain; opacity:0.8; animation: pulse 1s infinite;" class="ghost-random">`;
-                    } else {
-                        activeJokerMode = null;
-                    }
-                }
-            } else {
-                activeJokerMode = null;
-            }
-        } else {
-            activeJokerMode = null;
-        }
-        if (jokerDragInfo.clone)
-            jokerDragInfo.clone.remove();
-        jokerDragInfo = null;
-        if (!activeJokerMode) {
-            updateJokerUI();
-            clearGhost();
-        }
-    }
-}
-);
-
-document.addEventListener('pointermove', (e) => {
-    if (draggingElement) {
-        clearTooltip();
-        const bRect = boardEl.getBoundingClientRect();
-        
-        // 1. Hedef Hücre Genişliği ve Yüksekliği
-        const cW = bRect.width / 9;
-        const cH = bRect.height / 9;
-        
-        // 2. Mevcut Hücre Genişliği (DOM'dan anlık olarak okunur)
-        const firstPieceCell = draggingElement.querySelector('.piece-cell');
-        const currentCellWidth = firstPieceCell ? firstPieceCell.offsetWidth : 22; // Oyun içi fallback
-        
-        // 3. DİNAMİK ORAN
-        const scaleRatio = cW / currentCellWidth; 
-        
-        // Parmak Altı (Fat Finger) UX Koruması
-        const isTouch = e.pointerType === 'touch' || window.innerWidth <= 768;
-        const yOffset = isTouch ? -60 : 0;
-        
-        const dx = e.clientX - dragInfo.startX;
-        const dy = e.clientY - dragInfo.startY + yOffset;
-        
-        draggingElement.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleRatio.toFixed(2)})`;
-        
-        // Alt kısımdaki X,Y hesaplamaları (ghost çizimi vs.) olduğu gibi kalacak...
-        const fRect = draggingElement.querySelector('.piece').children[0].getBoundingClientRect();
-        const ptX = fRect.left + fRect.width / 2;
-        const ptY = fRect.top + fRect.height / 2;
-	if (ptX >= bRect.left && ptX <= bRect.right && ptY >= bRect.top && ptY <= bRect.bottom) {
-            let originC = Math.floor((ptX - bRect.left) / cW);
-            let originR = Math.floor((ptY - bRect.top) / cH);
-            if (!dragInfo.currentOrigin || dragInfo.currentOrigin.r !== originR || dragInfo.currentOrigin.c !== originC) {
-                dragInfo.currentOrigin = { r: originR, c: originC };
-                showGhostAndPredict(originR, originC);
-            }
-        } else {
-            dragInfo.currentOrigin = null;
-            clearGhost();
-        }
-        return;
-    }
-    if (pendingJokerDrag) {
-        let dx = e.clientX - pendingJokerDrag.startX;
-        let dy = e.clientY - pendingJokerDrag.startY;
-        if (Math.hypot(dx, dy) > 10) {
-            let data = pendingJokerDrag.data;
-            let idx = pendingJokerDrag.index;
-            pendingJokerDrag = null;
-            jokerPressIsLong = true;
-            if (data.type === 'hammer' || data.type === '1x1') {
-                clearTooltip();
-                if (!isGameRunning || activeAnimations > 0)
-                    return;
-                let iconSrc = data.type === 'hammer' ? 'icons/hammer_icon.png' : 'icons/random_block.png';
-                jokerDragInfo = {
-                    index: idx,
-                    type: data.type,
-                    clone: document.createElement('div')
-                };
-                jokerDragInfo.clone.innerHTML = `<img src="${iconSrc}" style="width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 10px 20px rgba(0,0,0,0.5));">`;
-                jokerDragInfo.clone.style.position = 'absolute';
-                jokerDragInfo.clone.style.width = '60px';
-                jokerDragInfo.clone.style.height = '60px';
-                jokerDragInfo.clone.style.zIndex = '100000';
-                jokerDragInfo.clone.style.pointerEvents = 'none';
-                document.body.appendChild(jokerDragInfo.clone);
-                jokerDragInfo.clone.style.left = (e.clientX - 30) + 'px';
-                jokerDragInfo.clone.style.top = (e.clientY - 30) + 'px';
-            }
-        }
-    }
-    if (jokerDragInfo) {
-        jokerDragInfo.clone.style.left = (e.clientX - 30) + 'px';
-        jokerDragInfo.clone.style.top = (e.clientY - 30) + 'px';
-        const bRect = boardEl.getBoundingClientRect();
-        if (e.clientX >= bRect.left && e.clientX <= bRect.right && e.clientY >= bRect.top && e.clientY <= bRect.bottom) {
-            const cW = bRect.width / 9;
-            const cH = bRect.height / 9;
-            let c = Math.floor((e.clientX - bRect.left) / cW);
-            let r = Math.floor((e.clientY - bRect.top) / cH);
-            if (r >= 0 && r < 9 && c >= 0 && c < 9) {
-                clearGhost();
-                if (jokerDragInfo.type === 'hammer') {
-                    for (let i = 0; i < 2; i++)
-                        for (let j = 0; j < 2; j++)
-                            if (r + i < 9 && c + j < 9)
-                                boardEl.children[(r + i) * 9 + (c + j)].classList.add('hover-hammer');
-                } else if (jokerDragInfo.type === '1x1') {
-                    if (boardState[r][c] === 0)
-                        boardEl.children[r * 9 + c].classList.add('hover-valid');
-                    else
-                        boardEl.children[r * 9 + c].classList.add('hover-invalid');
-                }
-            } else {
-                clearGhost();
-            }
-        } else {
-            clearGhost();
-        }
-    }
-}
-);
 
 function startDrag(e, index, data) {
     clearTooltip();
@@ -1073,19 +1151,37 @@ function startDrag(e, index, data) {
     }
     draggingElement = document.getElementById(`pw-${index}`);
     draggingElement.classList.add('dragging');
+    
+    // DOM OKUMALARINI SADECE 1 KERE BURADA YAPIYORUZ
     const rect = draggingElement.getBoundingClientRect();
+    const bRect = boardEl.getBoundingClientRect();
+    const firstPieceCell = draggingElement.querySelector('.piece-cell');
+    
+    const cW = bRect.width / 9;
+    const cH = bRect.height / 9;
+    const currentCellWidth = firstPieceCell ? firstPieceCell.offsetWidth : 22;
+    const scaleRatio = cW / currentCellWidth;
+    
+    const fRect = firstPieceCell ? firstPieceCell.getBoundingClientRect() : rect;
+    
     dragInfo = {
         index,
         shape: data.s,
         color: data.c,
         startX: rect.left + rect.width / 2,
         startY: rect.top + rect.height / 2,
+        initialPtX: fRect.left + fRect.width / 2, // İlk hücrenin gerçek konumu
+        initialPtY: fRect.top + fRect.height / 2,
+        scaleRatio: scaleRatio,
+        boardRect: bRect,
+        cellWidth: cW,
+        cellHeight: cH,
         currentOrigin: null,
         hasSpecial: data.hasSpecial,
         specialType: data.specialType,
         specialPos: data.specialPos,
-        hasKey: data.hasKey,
-        keyPos: data.keyPos
+        keyPositions: data.keyPositions,
+        icePositions: data.icePositions
     };
 }
 boardEl.addEventListener('pointerdown', (e) => {
@@ -1151,9 +1247,9 @@ boardEl.addEventListener('pointerdown', (e) => {
 
 function formatScore(num) {
     if (num >= 1000000)
-        return (num / 1000000).toFixed(1).replace('.0', '') + 'M';
+        return parseFloat((num / 1000000).toFixed(3)) + 'M';
     if (num >= 10000)
-        return (num / 1000).toFixed(1).replace('.0', '') + 'K';
+        return parseFloat((num / 1000).toFixed(1)) + 'K';
     return num.toString();
 }
 function spawnBgBlock() {
@@ -1200,6 +1296,7 @@ spawnBgBlock();
 function initBoardUI() {
     boardEl.innerHTML = '';
     boardState = Array(boardSize).fill().map( () => Array(boardSize).fill(0));
+    iceState = Array(boardSize).fill().map( () => Array(boardSize).fill(false));
     for (let r = 0; r < boardSize; r++)
         for (let c = 0; c < boardSize; c++) {
             const cell = document.createElement('div');
@@ -1248,10 +1345,10 @@ function updateComboUI(isBreak=false) {
             let intensity = (Math.min(displayCombo + baseIntensity, 6) - 1) / 12;
             
             comboContainer.classList.add('shaking');
-            comboContainer.style.setProperty('--shake-rot', (2 + intensity * 20) + 'deg');
-            comboContainer.style.setProperty('--shake-x', (1 + intensity * 15) + 'px');
-            comboContainer.style.setProperty('--shake-y', (1 + intensity * 15) + 'px');
-            comboContainer.style.setProperty('--shake-speed', (0.5 - intensity * 0.35) + 's');
+            comboContainer.style.setProperty('--shake-rot', (2 + intensity * 18) + 'deg');
+            comboContainer.style.setProperty('--shake-x', (1 + intensity * 13) + 'px');
+            comboContainer.style.setProperty('--shake-y', (1 + intensity * 13) + 'px');
+            comboContainer.style.setProperty('--shake-speed', (0.9 - intensity * 0.35) + 's');
         } else {
             comboContainer.classList.remove('shaking');
         }
@@ -1263,7 +1360,7 @@ function updateComboUI(isBreak=false) {
     // Kalkan (Shield) UI Güncellemesi
     const shieldUI = document.getElementById('life-shield-ui');
     if (gameState.lifeTurns > 0) {
-        shieldUI.style.display = 'block';
+        shieldUI.style.display = 'flex';
         document.getElementById('life-turns').innerText = gameState.lifeTurns;
     } else {
         shieldUI.style.display = 'none';
@@ -1334,15 +1431,15 @@ function updateOddsUI() {
 
     let u = Math.min(gameState.chestOddsLevel, 9); // Görsel ihtimaller eksilere düşmesin
     
-    document.getElementById('odd-pts1').innerText = `%${10 - u}`;
-    document.getElementById('odd-pts2').innerText = `%${15 - u}`;
-    document.getElementById('odd-pts3').innerText = `%${10 - u}`;
+    document.getElementById('odd-pts1').innerText = `%25`;
+    document.getElementById('odd-pts2').innerText = `%20`;
+    document.getElementById('odd-pts3').innerText = `%10`;
     document.getElementById('odd-pts4').innerText = `%5`;
-    document.getElementById('odd-mult-total').innerText = `%${35 - u}`;
-    document.getElementById('odd-joker').innerText = `%15`;
+    document.getElementById('odd-mult-total').innerText = `%10`;
+    document.getElementById('odd-joker').innerText = `%24`;
     
     // 1x1 Jokeri için yüzde ihtimali geri geldi
-    document.getElementById('odd-x1').innerText = `%${1 + (u * 2)}`;
+    document.getElementById('odd-x1').innerText = `%6`;
     
     // Yeni eklediğimiz Seviye sayacı
     if (document.getElementById('odd-level')) {
@@ -1395,6 +1492,9 @@ function updateMinusTooltips() {
             let cell = boardEl.children[r * 9 + c];
             cell.innerHTML = getIconHTML('minus', r, c);
             cell.classList.add('cursed-cell');
+            if (iceState[r] && iceState[r][c]) {
+                cell.prepend(createIceOverlayFragment('minus', r, c));
+            }
         }
     }
 }
@@ -1406,6 +1506,8 @@ function startGame() {
     activeAnimations = 0;
     score = 0;
     rawScore = 0;
+    turnChainAreas = 0;
+    turnMultiClear = 0;
     combo = 1;
     playerKeys = 0;
     playerJokers = [];
@@ -1450,6 +1552,14 @@ function startGame() {
 }
 
 
+function getIceChanceTiers() {
+    if (score <= 5000) return [0, 0, 0];
+    if (score <= 40000) return [0.05, 0, 0];
+    if (score <= 100000) return [0.06, 0.02, 0];
+    if (score <= 350000) return [0.05, 0.06, 0.01];
+    if (score <= 750000) return [0.04, 0.15, 0.05];
+    return [0.05, 0.15, 0.20];
+}
 function generatePieces(isShuffle=false) {
     currentPiecesData = Array(3).fill().map( () => {
         let s;
@@ -1470,30 +1580,48 @@ function generatePieces(isShuffle=false) {
         }
         let specType = rollSpecialItem();
         let specPos = null;
-        let hasKey = false;
-        let keyPos = null;
+        let keyPositions = [];
         let ones = [];
         for (let r = 0; r < s.length; r++)
             for (let c = 0; c < s[0].length; c++)
                 if (s[r][c] === 1)
-                    ones.push({
-                        r,
-                        c
-                    });
-        if (specType) {
-            specPos = ones[Math.floor(Math.random() * ones.length)];
-        } else {
-            // YENİ MANTIK: Tahtada (grid) 'cursedKey' var mı diye tüm satırları kontrol et
-            let isCursedOnGrid = boardState.some(row => row.includes('cursedKey'));
-            
-            // Gridde durduğu sürece anahtar çıkma ihtimali %0, yoksa normal ihtimal (%10)
-            let keyChance = isCursedOnGrid ? 0 : 0.10;
-            
-            if (Math.random() < keyChance) {
-                hasKey = true;
-                keyPos = ones[Math.floor(Math.random() * ones.length)];
-            }
+                    ones.push({ r, c });
+
+        let allOnes = ones.map(p => ({ ...p }));
+                    
+        // Special bloğu ata ve havuzdan çıkar ki aynı yerde anahtar çıkmasın
+        if (specType && ones.length > 0) {
+            let idx = Math.floor(Math.random() * ones.length);
+            specPos = ones[idx];
+            ones.splice(idx, 1);
         }
+        
+        let isCursedOnGrid = boardState.some((row, br) => row.some((v, bc) => v === 'cursedKey' && !(iceState[br] && iceState[br][bc])));
+        let baseKeyChance = isCursedOnGrid ? 0 : 0.07;
+        let keysFound = 0;
+
+        ones.forEach(pos => {
+            let currentChance = Math.pow(baseKeyChance, keysFound + 1);
+            
+            if (Math.random() < currentChance) {
+                keyPositions.push(pos);
+                keysFound++;
+            }
+        });
+
+        let icePositions = [];
+        if (!isShuffle && countIceOnBoard() < 15) {
+            let iceTiers = getIceChanceTiers();
+            let iceFound = 0;
+            allOnes.forEach(pos => {
+                if (iceFound >= 3) return;
+                if (Math.random() < iceTiers[iceFound]) {
+                    icePositions.push(pos);
+                    iceFound++;
+                }
+            });
+        }
+
         return {
             s,
             c: gameThemeColor,
@@ -1501,8 +1629,8 @@ function generatePieces(isShuffle=false) {
             hasSpecial: specType !== null,
             specialType: specType,
             specialPos: specPos,
-            hasKey: hasKey,
-            keyPos: keyPos
+            keyPositions: keyPositions,
+            icePositions: icePositions
         };
     }
     );
@@ -1514,18 +1642,20 @@ function generatePieces(isShuffle=false) {
         activeAnimations--;
         finalizeTurn();
     }
-    , 800);
+    , 400);
 }
 
 function renderPieces() {
     for (let i = 0; i < 3; i++) {
         const wrapper = document.getElementById(`pw-${i}`);
         wrapper.innerHTML = '';
+        wrapper.style.transition = 'none';
         wrapper.style.transform = 'translate(0px, 0px) scale(1)';
         wrapper.classList.remove('dragging', 'disabled', 'no-fit-anim');
         wrapper.style.animation = 'none';
         wrapper.offsetHeight;
         wrapper.style.animation = null;
+        wrapper.style.transition = null;
         
         // BUG FIX: Eski turdan kalan kararma (disabled) inline stillerini temizle
         wrapper.style.opacity = '';
@@ -1544,12 +1674,17 @@ function renderPieces() {
                 cell.className = 'piece-cell';
                 if (data.s[r][c] === 1) {
                     cell.style.backgroundColor = data.c;
+                    let isIceCell = data.icePositions && data.icePositions.some(k => k.r === r && k.c === c);
                     if (data.hasSpecial && data.specialPos.r === r && data.specialPos.c === c) {
                         cell.innerHTML = getIconHTML(data.specialType, undefined, undefined);
                         if (['scoreDown', 'skull', 'cursedKey', 'minus'].includes(data.specialType))
                             cell.classList.add('cursed-cell');
-                    } else if (data.hasKey && data.keyPos.r === r && data.keyPos.c === c) {
+                    } else if (data.keyPositions && data.keyPositions.some(k => k.r === r && k.c === c)) {
                         cell.innerHTML = getIconHTML('K');
+                    }
+                    if (isIceCell) {
+                        let underlyingType = (data.hasSpecial && data.specialPos.r === r && data.specialPos.c === c) ? data.specialType : ((data.keyPositions && data.keyPositions.some(k => k.r === r && k.c === c)) ? 'K' : 1);
+                        cell.prepend(createIceOverlayFragment(underlyingType, undefined, undefined));
                     }
                 }
                 pieceEl.appendChild(cell);
@@ -1585,12 +1720,13 @@ function updateTrayPiecesState() {
                 wrapper.style.pointerEvents = 'none';
             }
         }
-    }, 850);
+    }, 450);
 }
 
 function saveHistory() {
     historyState = {
         board: boardState.map(row => [...row]),
+        ice: iceState.map(row => [...row]),
         pieces: JSON.parse(JSON.stringify(currentPiecesData)),
         combo: combo,
         mult: {
@@ -1649,14 +1785,96 @@ function canPlace(brd, shape, startR, startC) {
             }
     return true;
 }
-function placePiece(shape, startR, startC, color, hasSpec, specType, specPos, hasKey, keyPos) {
+function createIceOverlayFragment(underlyingType, r, c) {
+    const wrap = document.createElement('div');
+    wrap.className = 'ice-overlay-wrap';
+
+    const img = document.createElement('img');
+    img.src = 'icons/ice.png';
+    img.className = 'ice-overlay-icon';
+    img.draggable = false;
+    wrap.appendChild(img);
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'special-tooltip';
+
+    const frozenLabel = document.createElement('span');
+    frozenLabel.className = 'frozen-tooltip-label';
+    frozenLabel.textContent = t('ice_frozen_label');
+    tooltip.appendChild(frozenLabel);
+
+    if (underlyingType !== undefined && underlyingType !== 1 && typeof getSpecialDesc === 'function') {
+        const underlyingDesc = getSpecialDesc(underlyingType, r, c);
+        if (underlyingDesc) {
+            const descLine = document.createElement('span');
+            descLine.className = 'frozen-tooltip-desc';
+            descLine.textContent = underlyingDesc;
+            tooltip.appendChild(descLine);
+        }
+    }
+
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(wrap);
+    fragment.appendChild(tooltip);
+    return fragment;
+}
+function countIceOnBoard() {
+    let n = 0;
+    for (let r = 0; r < boardSize; r++)
+        for (let c = 0; c < boardSize; c++)
+            if (iceState[r] && iceState[r][c]) n++;
+    return n;
+}
+function renderRevealedCell(r, c) {
+    const cell = boardEl.children[r * boardSize + c];
+    const type = boardState[r][c];
+    if (type === 0) {
+        cell.innerHTML = '';
+        return;
+    }
+    if (type !== 1) {
+        cell.innerHTML = getIconHTML(type, r, c);
+        if (['scoreDown', 'skull', 'cursedKey', 'minus'].includes(type))
+            cell.classList.add('cursed-cell');
+    } else {
+        cell.innerHTML = '';
+    }
+}
+function breakIce(r, c, cachedBoardRect) {
+    if (!iceState[r] || !iceState[r][c]) return;
+    iceState[r][c] = false;
+    if(typeof SFX!=='undefined' && SFX.hammerCrack) SFX.hammerCrack();
+    const cell = boardEl.children[r * boardSize + c];
+    const iceImg = cell.querySelector('.ice-overlay-icon');
+    if (iceImg) iceImg.classList.add('ice-breaking');
+
+    const bRect = cachedBoardRect || boardEl.getBoundingClientRect();
+    const cellW = bRect.width / boardSize;
+    const cellH = bRect.height / boardSize;
+    const centerX = bRect.left + c * cellW + cellW / 2;
+    const centerY = bRect.top + r * cellH + cellH / 2;
+
+    // --- ESKİ GIF KODU YERİNE PARTİKÜL PATLAMASI ---
+    if (typeof window.spawnIceParticle === 'function') {
+        for(let i = 0; i < 20; i++) { // Aynı anda 20 partikül fırlatır
+            window.spawnIceParticle(centerX, centerY, 'burst');
+        }
+    }
+
+    setTimeout( () => {
+        renderRevealedCell(r, c);
+    }
+    , 380);
+}
+function placePiece(shape, startR, startC, color, hasSpec, specType, specPos, keyPositions, icePositions) {
     for (let r = 0; r < shape.length; r++)
         for (let c = 0; c < shape[0].length; c++)
             if (shape[r][c] === 1) {
                 const br = startR + r
                   , bc = startC + c;
                 let isSpecCell = (hasSpec && specPos.r === r && specPos.c === c);
-                let isKeyCell = (hasKey && keyPos.r === r && keyPos.c === c);
+                let isKeyCell = (keyPositions && keyPositions.some(k => k.r === r && k.c === c));
+                let isIceCell = (icePositions && icePositions.some(k => k.r === r && k.c === c));
                 if (isSpecCell) {
                     boardState[br][bc] = specType;
                     if (specType === 'minus')
@@ -1667,6 +1885,7 @@ function placePiece(shape, startR, startC, color, hasSpec, specType, specPos, ha
                     boardState[br][bc] = 'K';
                 else
                     boardState[br][bc] = 1;
+                iceState[br][bc] = isIceCell;
                 const cell = boardEl.children[br * boardSize + bc];
                 cell.classList.add('filled');
 		if(typeof SFX!=='undefined') SFX.place();
@@ -1677,6 +1896,9 @@ function placePiece(shape, startR, startC, color, hasSpec, specType, specPos, ha
                         cell.classList.add('cursed-cell');
                 } else if (isKeyCell) {
                     cell.innerHTML = getIconHTML('K');
+                }
+                if (isIceCell) {
+                    cell.prepend(createIceOverlayFragment(boardState[br][bc], br, bc));
                 }
             }
 }
@@ -1700,6 +1922,7 @@ function confirmOneByOne(r, c) {
 }
 function use1x1At(r, c, idx) {
     saveHistory();
+    jokerUsedThisTurn = true;
     let rNum = Math.random();
     let typeToPlace = 1;
     if (rNum < 0.30) {
@@ -1740,6 +1963,7 @@ function use1x1At(r, c, idx) {
 function useHammerAt(r, c) {
     saveHistory();
     stats.hammersUsed++;
+    jokerUsedThisTurn = true;
     document.body.classList.add('shake-3');
     if(typeof SFX!=='undefined') SFX.hammerCrack();
     setTimeout( () => document.body.classList.remove('shake-3'), 500);
@@ -1762,12 +1986,17 @@ function useHammerAt(r, c) {
     let triggeredAreas = [];
     turnClearedBlocks = 0;
     turnPoints = 0;
+    const hammerBoardRect = boardEl.getBoundingClientRect();
     for (let i = 0; i < 2; i++) {
         for (let j = 0; j < 2; j++) {
             if (r + i < 9 && c + j < 9) {
                 let cell = boardEl.children[(r + i) * 9 + (c + j)];
                 let type = boardState[r + i][c + j];
                 if (type !== 0) {
+                    if (iceState[r + i] && iceState[r + i][c + j]) {
+                        breakIce(r + i, c + j, hammerBoardRect);
+                        continue;
+                    }
                     if (['+', 'row', 'col', '?', 'X', 'M'].includes(type)) {
                         triggeredAreas.push({
                             r: r + i,
@@ -1814,7 +2043,10 @@ flyItemToTarget(cell, 'K', document.getElementById('chest-btn'), () => {
         }
     }
     if (activeJokerIndex > -1 && playerJokers[activeJokerIndex]) {
-        playerJokers.splice(activeJokerIndex, 1);
+        playerJokers[activeJokerIndex].count = (playerJokers[activeJokerIndex].count || 1) - 1;
+        if(playerJokers[activeJokerIndex].count <= 0) {
+            playerJokers.splice(activeJokerIndex, 1);
+        }
     }
     activeJokerMode = null;
     hammerLockedPos = null;
@@ -1823,14 +2055,17 @@ flyItemToTarget(cell, 'K', document.getElementById('chest-btn'), () => {
     updateTrayPiecesState();
     if (triggeredAreas.length > 0) {
         activeAnimations++;
+        // Çekiçte sadece kombo veya aktif buff varsa bekleme süresi uzatılır
+        let chainDelay = (combo >= 2 || (activeMultiplier.active && activeMultiplier.turns > 0)) ? 1500 : 800; 
+        
         setTimeout( () => {
             executeAreaChains(triggeredAreas, 1);
-        }
-        , 600);
+        }, chainDelay);
     } else {
         finalizeTurn();
     }
 }
+
 
 function triggerSpecials(type, cell, r, c, isHammerOrArea) {
     let scoreMod = 0;
@@ -1911,33 +2146,17 @@ function triggerSpecials(type, cell, r, c, isHammerOrArea) {
             let pct = 5;
             if (specialBlockStates[`${r},${c}`]) {
                 let age = totalTurns - specialBlockStates[`${r},${c}`].turnPlaced;
-                pct = Math.min(20, 5 + (age * 1));
+                pct = Math.min(20, 1 + (age * 1));
             }
             let penalty = Math.floor(score * (pct / 100));
-            
-            // YENİ: Cezayı havuzdan değil, DOĞRUDAN ana skordan düşüyoruz!
-            score -= penalty;
-            score = Math.max(0, score);
-            document.getElementById('score').innerText = formatScore(score);
-            
-            // Skorda kırmızı bir sarsıntı efekti yaratalım
-            let s = document.getElementById('score');
-            s.style.color = '#e74c3c';
-            s.style.transform = 'scale(1.3)';
-            setTimeout(() => { s.style.transform = 'scale(1)'; s.style.color = ''; }, 300);
 
             if (penalty > stats.maxPenalty)
                 stats.maxPenalty = penalty;
-            showPraise(`-${penalty} PUAN!`, "#c0392b");
 
-            // KRİTİK: Geri Al (Undo) jokerinin bu cezayı da geri verebilmesi için geçmişe işliyoruz
-            if (historyState) {
-                historyState.earnedPoints = (historyState.earnedPoints || 0) - penalty;
-            }
-
-            scoreMod = 0; // Kazanç havuzunu (earnedPoints) eksiltmemesi için 0 döndürüyoruz!
-        }
-    } else {
+           
+            scoreMod = -penalty;
+           }
+        } else {
         if (['scoreDown', 'skull', 'cursedKey', 'minus'].includes(type))
             stats.cursedBlocksNeutralized++;
     }
@@ -1952,9 +2171,8 @@ function executeAreaChains(areas, chainCombo) {
             return;
         }
         let area = areas.shift();
+        turnChainAreas++;
         let targets = [];
-        
-        // YENİ: Seçilen yönün ikonunu hafızada tutmak için değişken
         let displayType = area.type;
 
         if (area.type === 'row') {
@@ -1965,7 +2183,6 @@ function executeAreaChains(areas, chainCombo) {
             for (let c = 0; c < 9; c++) if (c !== area.c) targets.push({ r: area.r, c: c });
             for (let r = 0; r < 9; r++) if (r !== area.r) targets.push({ r: r, c: area.c });
         } else if (area.type === '?') {
-            // YENİ: %33 ihtimalle Yatay (row), Dikey (col) veya Çapraz (X) patlatma
             let roll = Math.random();
             if (roll < 0.333) {
                 displayType = 'row';
@@ -1984,7 +2201,6 @@ function executeAreaChains(areas, chainCombo) {
                 }
             }
         } else if (area.type === 'X') {
-            // YENİ: Çapraz Alan Bloğu
             for (let i = -8; i <= 8; i++) {
                 if (i === 0) continue;
                 if (area.r + i >= 0 && area.r + i < 9 && area.c + i >= 0 && area.c + i < 9)
@@ -1993,7 +2209,6 @@ function executeAreaChains(areas, chainCombo) {
                     targets.push({ r: area.r + i, c: area.c - i });
             }
         } else if (area.type === 'M') {
-            // YENİ: Mega Tüm Alan Bloğu
             for (let i = 0; i < 9; i++) {
                 for (let j = 0; j < 9; j++) {
                     if (i !== area.r || j !== area.c) targets.push({ r: i, c: j });
@@ -2001,38 +2216,28 @@ function executeAreaChains(areas, chainCombo) {
             }
         }
 
-        combo++;
-	if (typeof window.playDynamicSound === 'function') window.playDynamicSound('combo', combo);
-        updateComboUI();
-        fireAgroMultiplier(Math.min(combo, 10));
-        if(typeof SFX!=='undefined') SFX.areaBlock(); // SFX KORUNDU
+        fireAgroMultiplier(Math.min(combo + 1, 10)); 
+        if(typeof SFX!=='undefined') SFX.areaBlock();
         
-        let earnedPoints = 0;
         let newAreas = [];
         const originCell = boardEl.children[area.r * 9 + area.c];
         if (originCell) originCell.classList.add('levitate-anim');
+        const areaBoardRect = boardEl.getBoundingClientRect();
 
         targets.sort((a, b) => (Math.abs(a.r - area.r) + Math.abs(a.c - area.c)) - (Math.abs(b.r - area.r) + Math.abs(b.c - area.c)));
         let maxDist = 0;
 
-        // ----------------------------------------------------
-        // YENİ: DÖNÜŞÜM ANİMASYONU VE BEKLETME MOTORU
-        // ----------------------------------------------------
         let blastDelay = 0; 
-
         if (area.type === '?') {
             blastDelay = 650; 
-            
             if (originCell) {
                 boardState[area.r][area.c] = displayType; 
-                
                 let oldImg = originCell.querySelector('img');
                 if (oldImg) {
                     oldImg.style.transition = 'transform 0.2s ease-in, opacity 0.2s ease-in';
                     oldImg.style.transform = 'scale(0) rotate(180deg)';
                     oldImg.style.opacity = '0';
                 }
-
                 setTimeout(() => {
                     originCell.innerHTML = getIconHTML(displayType, area.r, area.c);
                     let newImg = originCell.querySelector('img');
@@ -2048,10 +2253,10 @@ function executeAreaChains(areas, chainCombo) {
             }
         }
 
-        // ----------------------------------------------------
-        // ASIL PATLATMA ZİNCİRİ
-        // ----------------------------------------------------
         setTimeout(() => {
+            let earnedBase = 0;
+            let specialMod = 0;
+
             targets.forEach(t => {
                 let dist = Math.abs(t.r - area.r) + Math.abs(t.c - area.c);
                 maxDist = Math.max(maxDist, dist);
@@ -2072,12 +2277,16 @@ function executeAreaChains(areas, chainCombo) {
 
                     if (type === 0) return;
 
+                    if (iceState[t.r] && iceState[t.r][t.c]) {
+                        breakIce(t.r, t.c, areaBoardRect);
+                        return;
+                    }
+
                     if (['+', 'row', 'col', '?', 'X', 'M'].includes(type)) {
                         let exists = areas.some(a => a.r === t.r && a.c === t.c) || newAreas.some(a => a.r === t.r && a.c === t.c);
                         if (!exists) newAreas.push({ r: t.r, c: t.c, type });
                     } else {
-                        // KRİTİK DEĞİŞİKLİK: 'false' gönderimi KORUNDU!
-                        let pMod = triggerSpecials(type, cell, t.r, t.c, false);
+                        specialMod += triggerSpecials(type, cell, t.r, t.c, false);
                         boardState[t.r][t.c] = 0;
                         turnClearedBlocks++;
                         rawScore++;
@@ -2089,7 +2298,7 @@ function executeAreaChains(areas, chainCombo) {
                             cell.className = `cell ${(Math.floor(t.r / 3) + Math.floor(t.c / 3)) % 2 === 1 ? 'nth-region' : ''}`;
                             cell.style.backgroundColor = '';
                         }, 500);
-                        earnedPoints += (gameState.baseBlockScore * combo) + pMod;
+                        earnedBase += gameState.baseBlockScore; 
                     }
                 }, dist * 80);
             });
@@ -2107,14 +2316,66 @@ function executeAreaChains(areas, chainCombo) {
                         originCell.classList.remove('area-block-clear');
                     }, 600);
                 }
-                if (earnedPoints !== 0) {
-                    if (earnedPoints > 0 && activeMultiplier.active && activeMultiplier.turns > 0) earnedPoints *= activeMultiplier.value;
-                    tallyPoints(earnedPoints);
+                
+                // Zincir halkası için önceki eli baz al
+                let appliedCombo = combo;
+                
+                // HATA 2 ÇÖZÜMÜ: Kombo artışı tam meteor çarpışmasına denk gelsin diye 600ms geciktirildi
+                setTimeout(() => {
+                    combo++;
+                    if (typeof window.playDynamicSound === 'function') window.playDynamicSound('combo', combo);
+                    updateComboUI();
+                }, 600);
+                
+                let effCombo = (activeMultiplier.active && activeMultiplier.turns > 0) ? (appliedCombo * activeMultiplier.value) : appliedCombo;
+                let netScore = earnedBase + specialMod; 
+                let currentPts = netScore;
+                let hits = [];
+
+                if (netScore !== 0) {
+                    if (effCombo >= 2) {
+                        let prevPts = currentPts;
+                        currentPts = currentPts * effCombo;
+                        const cEl = document.getElementById('combo-display');
+                        const cRect = cEl.getBoundingClientRect();
+                        hits.push({
+                            val: effCombo,
+                            type: 'combo',
+                            originX: cRect.left + (cRect.width / 2) - 10,
+                            originY: cRect.top + (cRect.height / 2) - 25,
+                            delta: currentPts - prevPts 
+                        });
+                    }
+                    
+                    if (historyState) historyState.earnedPoints = (historyState.earnedPoints || 0) + currentPts;
+                    
+                    areas.push(...newAreas);
+                    let isChainEnd = (areas.length === 0);
+                    
+                    tallyPoints(netScore, { hits: hits }, !isChainEnd, isChainEnd);
+                    
+                    if (!isChainEnd) {
+                        let nextChainDelay = (effCombo >= 2) ? 1400 : 800;
+                        setTimeout(() => executeAreaChains(areas, chainCombo + 1), nextChainDelay);
+                    } else {
+                        // HATA 1 ÇÖZÜMÜ (KİLİT AÇMA): Zincir bittiyse turu bitirebilmesi için 
+                        // fonksiyonu boş bir listeyle son kez bilerek çağırıyoruz!
+                        setTimeout(() => executeAreaChains(areas, chainCombo + 1), 100);
+                    }
+                } else {
+                    areas.push(...newAreas);
+                    let isChainEnd = (areas.length === 0);
+                    if (isChainEnd) {
+                        finalizeGlobalTally(); 
+                        // HATA 1 ÇÖZÜMÜ (KİLİT AÇMA): 
+                        setTimeout(() => executeAreaChains(areas, chainCombo + 1), 100);
+                    } else {
+                        let nextChainDelay = (effCombo >= 2) ? 1400 : 800;
+                        setTimeout(() => executeAreaChains(areas, chainCombo + 1), nextChainDelay);
+                    }
                 }
-                areas.push(...newAreas);
-                setTimeout(() => executeAreaChains(areas, chainCombo + 1), 200);
+                
             }, maxDist * 80 + 350);
-            
         }, blastDelay); 
         
     } catch (err) {
@@ -2123,7 +2384,8 @@ function executeAreaChains(areas, chainCombo) {
         finalizeTurn();
     }
 }
-
+// YENİ: Fonksiyon artık yerleştirme puanını da kabul ediyor
+// YENİ: Fonksiyon artık yerleştirme puanını da kabul ediyor
 // YENİ: Fonksiyon artık yerleştirme puanını da kabul ediyor
 function checkBoardLogic(isFreeTurn=false, placementPoints=0) {
     let toClear = new Set();
@@ -2139,111 +2401,170 @@ function checkBoardLogic(isFreeTurn=false, placementPoints=0) {
             colsCleared++;
             for (let r = 0; r < 9; r++) toClear.add(`${r},${c}`);
         }
-    for (let br = 0; br < 3; br++)
+    for (let br = 0; br < 3; br++) {
         for (let bc = 0; bc < 3; bc++) {
             let filled = true;
             for (let i = 0; i < 3; i++)
                 for (let j = 0; j < 3; j++)
                     if (boardState[br * 3 + i][bc * 3 + j] === 0) filled = false;
-            if (filled)
+            
+            // EKSİK PARANTEZ HATASI DÜZELTİLDİ!
+            if (filled) {
+                boxesCleared++;
                 for (let i = 0; i < 3; i++)
                     for (let j = 0; j < 3; j++)
                         toClear.add(`${br * 3 + i},${bc * 3 + j}`);
+            }
         }
-
+    }
+    
+    let totalMultiClear = rowsCleared + colsCleared + boxesCleared;
+    if (totalMultiClear > turnMultiClear) turnMultiClear = totalMultiClear;
     let triggeredAreas = [];
-    let earnedPoints = placementPoints; // Puanı yerleştirme puanıyla başlatıyoruz
 
     if (toClear.size > 0) {
-        combo++;
-	if (typeof window.playDynamicSound === 'function') window.playDynamicSound('combo', combo);
-        let mult = calculateMultiplier(rowsCleared, colsCleared, boxesCleared);
-        let clearPts = toClear.size * gameState.baseBlockScore * mult * combo;
+        let appliedCombo = combo;
+        combo++; // Bir sonraki el için komboyu artır
+        if (typeof window.playDynamicSound === 'function') window.playDynamicSound('combo', combo);
+        updateComboUI(); 
         
-        if (activeMultiplier.active && activeMultiplier.turns > 0) {
-            clearPts *= activeMultiplier.value;
-            if (!isFreeTurn) activeMultiplier.turns--;
-            updateMultUI();
-        }
+        let areaMult = calculateMultiplier(rowsCleared, colsCleared, boxesCleared);
+        let effCombo = (activeMultiplier.active && activeMultiplier.turns > 0) ? (appliedCombo * activeMultiplier.value) : appliedCombo;
         
-        earnedPoints += clearPts; // Yerleştirme + Patlatma puanı toplamı
+        let baseClearPts = toClear.size * gameState.baseBlockScore;
+        if (areaMult > 1) fireAgroMultiplier(areaMult); 
+            
+        const clearBoardRect = boardEl.getBoundingClientRect();
+        let specialPts = 0; 
         
-   
-        if (mult > 1)
-            fireAgroMultiplier(mult);
         Array.from(toClear).forEach( (coord) => {
             let[r,c] = coord.split(',').map(Number);
+            if (iceState[r] && iceState[r][c]) {
+                breakIce(r, c, clearBoardRect);
+                return;
+            }
             let type = boardState[r][c];
             if (['+', 'row', 'col', '?', 'X', 'M'].includes(type)) {
-                triggeredAreas.push({
-                    r,
-                    c,
-                    type
-                });
-                // ZİNCİRE EKLENDİ, AMA SİLİNMEDİ!
+                triggeredAreas.push({ r, c, type });
             } else {
-                earnedPoints += triggerSpecials(type, boardEl.children[r * 9 + c], r, c, false);
+                specialPts += triggerSpecials(type, boardEl.children[r * 9 + c], r, c, false);
                 boardState[r][c] = 0;
                 turnClearedBlocks++;
                 rawScore++;
-                delete specialBlockStates[`${r},c`];
+                delete specialBlockStates[`${r},${c}`];
                 let cell = boardEl.children[r * 9 + c];
                 cell.innerHTML = '';
                 cell.classList.remove('cursed-cell', 'show-tooltip');
                 cell.classList.add('clearing');
                 setTimeout( () => {
-		    cell.style.transition = 'none';
+                    cell.style.transition = 'none';
                     cell.className = `cell ${(Math.floor(r / 3) + Math.floor(c / 3)) % 2 === 1 ? 'nth-region' : ''}`;
                     cell.style.backgroundColor = '';
-		    void cell.offsetHeight;
-    		    cell.style.transition = '';
-                }
-                , 500);
+                    void cell.offsetHeight;
+                    cell.style.transition = '';
+                }, 500);
             }
+        });
+        
+        let netScore = placementPoints + baseClearPts + specialPts; 
+        let currentPts = netScore;
+        let hits = [];
+        
+        if (areaMult > 1) {
+            let prevPts = currentPts;
+            currentPts = currentPts * areaMult;
+            const bRect = boardEl.getBoundingClientRect();
+            hits.push({
+                val: areaMult,
+                type: 'mult', 
+                originX: bRect.left + bRect.width / 2,
+                originY: bRect.top + bRect.height / 2,
+                delta: currentPts - prevPts 
+            });
         }
-        );
-        if (historyState)
-            historyState.earnedPoints = (historyState.earnedPoints || 0) + earnedPoints;
-        updateComboUI();
-        tallyPoints(earnedPoints);
-        if (triggeredAreas.length > 0) {
+        
+        if (effCombo >= 2) {
+            let prevPts = currentPts;
+            currentPts = currentPts * effCombo; 
+            const cEl = document.getElementById('combo-display');
+            const cRect = cEl.getBoundingClientRect();
+            hits.push({
+                val: effCombo,
+                type: 'combo', 
+                originX: cRect.left + (cRect.width / 2) - 10,
+                originY: cRect.top + (cRect.height / 2) - 25,
+                delta: currentPts - prevPts 
+            });
+        }
+        
+        if (historyState) historyState.earnedPoints = (historyState.earnedPoints || 0) + currentPts;
+        
+        if (!isFreeTurn && activeMultiplier.active && activeMultiplier.turns > 0) {
+            activeMultiplier.turns--;
+            updateMultUI();
+        }
+        
+        let isChain = triggeredAreas.length > 0;
+        tallyPoints(netScore, { hits: hits }, isChain, !isChain);
+        
+        if (isChain) {
             activeAnimations++;
-            setTimeout( () => {
-                executeAreaChains(triggeredAreas, 1);
-            }
-            , 600);
+            let chainDelay = (areaMult > 1 || effCombo >= 2) ? 700 : 400; 
+            setTimeout(() => { executeAreaChains(triggeredAreas, 1); }, chainDelay);
         }
     } else {
         if (!isFreeTurn) {
-            if (activeMultiplier.active && activeMultiplier.turns > 0) {
+            let effCombo = (activeMultiplier.active && activeMultiplier.turns > 0) ? activeMultiplier.value : 1;
+            let currentPts = placementPoints;
+            let val0 = placementPoints;
+            let hits = [];
+
+            if (effCombo >= 2 && placementPoints > 0) {
+                currentPts = placementPoints * effCombo;
+                const cEl = document.getElementById('combo-display');
+                const cRect = cEl.getBoundingClientRect();
+                hits.push({
+                    val: effCombo,
+                    type: 'combo', 
+                    originX: cRect.left + (cRect.width / 2) - 10,
+                    originY: cRect.top + (cRect.height / 2) - 25,
+                    delta: currentPts - val0
+                });
                 activeMultiplier.turns--;
                 updateMultUI();
             }
+
             if (gameState.lifeTurns > 0) {
                 gameState.lifeTurns--;
                 updateComboUI();
             } else {
                 let hadCombo = combo > 1;
                 combo = 1;
-                if (hadCombo)
-                    updateComboUI(true);
-                else
-                    updateComboUI();
+                updateComboUI(hadCombo);
             }
-            if (historyState)
-                historyState.earnedPoints = (historyState.earnedPoints || 0) + placementPoints;
+
+            if (historyState) historyState.earnedPoints = (historyState.earnedPoints || 0) + currentPts;
                 
-            if (placementPoints > 0) {
-                tallyPoints(placementPoints);
+            if (val0 > 0) {
+                
+                    tallyPoints(val0, { hits: hits }, false, true); 
+                
             }
         }
     }
     if (!isFreeTurn) {
-        totalTurns++;
-        updateMinusTooltips();
+        for (let r = 0; r < boardSize; r++) {
+            for (let c = 0; c < boardSize; c++) {
+                // Eğer eksi blok buzun altındaysa, yaşlanmasını durdur (turnPlaced değerini totalTurns ile birlikte artır)
+                if (iceState[r] && iceState[r][c] && boardState[r][c] === 'minus' && specialBlockStates[`${r},${c}`]) {
+                    specialBlockStates[`${r},${c}`].turnPlaced++;
+                }
+            }
+        }
+        updateMinusTooltips(); // Ekrandaki yüzde sayılarını yenile
     }
-    if (triggeredAreas.length === 0)
-        finalizeTurn();
+    
+    if (triggeredAreas.length === 0) finalizeTurn();
 }
 
 function flyItemToTarget(cellEl, type, targetEl, onArrive) {
@@ -2393,6 +2714,7 @@ function triggerGameOverSequence() {
     }
     isGameRunning = false;
     document.getElementById('mult-info').style.opacity = '0';
+    document.getElementById('mult-info').classList.remove('active');
     saveCurrentToHighScores();
     localStorage.removeItem(STORAGE_KEY);
     for (let i = 0; i < 3; i++)
@@ -2518,22 +2840,44 @@ const showStatsInBoard = () => {
 }
 
 function calculateMultiplier(r, c, b) {
-    let t = r + c + b;
-    if (t <= 1)
-        return 1;
-    if (b === 1 && (r + c) === 1)
-        return 2;
-    if (b === 2 && (r + c) === 0)
-        return 3;
-    if (r === 1 && c === 1 && b === 0)
-        return 3;
-    if ((r === 2 && c === 0 && b === 0) || (r === 0 && c === 2 && b === 0))
-        return 4;
-    if (r >= 1 && c >= 1 && b >= 1)
-        return 5;
-    if (t > 2)
-        return 10;
-    return 2;
+    // 1. ZIRH: Gelen verileri zorla Number (Sayı) formatına çevir.
+    // Eğer oyun boş gönderirse (null/undefined) otomatik olarak 0 say!
+    let row = Number(r) || 0;
+    let col = Number(c) || 0;
+    let box = Number(b) || 0;
+    
+    let total = row + col + box;
+    
+    // Sadece 1 alan kırıldıysa çarpana gerek yok (x1)
+    if (total <= 1) return 1; 
+    
+    // Toplam 2 alan kırıldıysa:
+    if (total === 2) {
+        // 1 kutu ve 1 satır/sütun kırılırsa: x2
+        if (box === 1 && (row === 1 || col === 1)) return 2; 
+        
+        // 2 kutu kırılırsa: x3
+        if (box === 2) return 3; 
+        
+        // 1 satır ve 1 sütun kırılırsa: x3
+        if (row === 1 && col === 1) return 3; 
+        
+        // 2 satır veya 2 sütun kırılırsa: x4
+        if (row === 2 || col === 2) return 4; 
+        
+        // ZIRH 2: Eğer olağanüstü bir durum olur da yukarıdakilere takılmazsa 
+        // 2 alan kırıldığı için en kötü ihtimalle garanti olarak x2 döndür!
+        return 2; 
+    }
+    
+    // Satır, sütun ve kutudan en az 1'er tane aynı anda kırılırsa (Örn: 1 satır + 1 sütun + 1 kutu): x5
+    if (row >= 1 && col >= 1 && box >= 1) return 5; 
+    
+    // Toplam kırılan alan sayısı 2'den fazlaysa (yukarıdaki x5 istisnası hariç): x10
+    if (total > 2) return 10;
+    
+    // ZIRH 3: Hiçbir şeye uymazsa oyunu çökertme, çarpanı 1 ver geç.
+    return 1; 
 }
 function fireAgroMultiplier(m) {
     const a = document.getElementById('agro-multiplier');
@@ -2547,136 +2891,345 @@ function fireAgroMultiplier(m) {
     document.body.classList.add(m >= 5 ? 'shake-3' : (m >= 3 ? 'shake-2' : 'shake-1'));
     setTimeout( () => document.body.classList.remove(m >= 5 ? 'shake-3' : (m >= 3 ? 'shake-2' : 'shake-1')), 500);
 }
-function showPraise(text, color) {
+function showPraise(textKey, color) {
+    // Ekranda halihazırda bir yazı varsa anında sil (Üst üste binmeyi kesin engeller)
+    if (activePraiseEl && activePraiseEl.parentNode) {
+        activePraiseEl.remove();
+    }
+
+    // Metni dictionary.json'dan çek
+    let translatedText = typeof t === 'function' ? t(textKey) : textKey;
+
     const praiseEl = document.createElement('div');
     praiseEl.className = 'praise-text';
-    praiseEl.innerText = text;
+    praiseEl.innerText = translatedText;
     praiseEl.style.color = color;
     praiseEl.style.textShadow = `0 10px 20px rgba(0,0,0,0.5), 0 0 20px ${color}, 0 0 40px ${color}`;
     document.body.appendChild(praiseEl);
-    setTimeout( () => {
-        if (praiseEl.parentNode)
-            praiseEl.remove();
-    }
-    , 1200);
+
+    activePraiseEl = praiseEl;
+
+    // Ekranda kalma süresi
+    setTimeout(() => {
+        if (praiseEl.parentNode) praiseEl.remove();
+        if (activePraiseEl === praiseEl) activePraiseEl = null;
+    }, 1200);
 }
 
-function tallyPoints(pts) {
-    turnPoints += pts;
-    // --- YENİ: KESE YÖNLENDİRME SİSTEMİ ---
-    if (pts > 0 && playerJokers && playerJokers.some(j => j.type === 'bundle')) {
-        let bundleIdx = -1;
+function evaluateAndShowPraise() {
+    // 1. ÖNCELİK: Zincirleme Alan Patlatma (Area Chain)
+    if (turnChainAreas >= 3) {
+        showPraise("praise_multi_mega", "#e74c3c"); 
+        return; 
+    }
+
+    // 2. ÖNCELİK: Aynı Anda Çoklu Patlatma
+    if (turnMultiClear >= 4) {
+        showPraise("praise_multi_4", "#9b59b6"); 
+        return;
+    } else if (turnMultiClear === 3) {
+        showPraise("praise_multi_3", "#3498db"); 
+        return;
+    } else if (turnMultiClear === 2) {
+        showPraise("praise_multi_2", "#2ecc71"); 
+        return;
+    }
+
+    if (turnPoints > 0) {
+        // YENİ VE SAĞLAM YÜZDE MANTIĞI:
+        // Skor 20.000'den küçükse, yüzde hesabını 20.000 üzerinden yap.
+        // Bu sayede oyunun başında küçük puanların %60, %100 çıkması gibi saçmalıklar önlenir!
+        let effectiveScore = Math.max(score, 20000); 
+        let percentOfScore = turnPoints / effectiveScore;
+
+        // 3. ÖNCELİK: Efektif Joker Kullanımı ("Zekice Hamle")
+        // Joker turunda en az 3000 puan ya da efektif skorun %15'i alınmışsa
+        if (jokerUsedThisTurn && (turnPoints >= 3000 || percentOfScore >= 0.15)) {
+            showPraise("praise_joker", "#e67e22"); // Turuncu
+            return;
+        }
+
+        // 4. ÖNCELİK: Zorlaştırılmış Kombo
+        if (combo >= 5 && activeMultiplier.active && activeMultiplier.turns > 0) {
+            showPraise("praise_combo", "#f1c40f"); // Sarı
+            return;
+        }
+
+        // 5. ÖNCELİK: Puan Büyüklüğü (Minimum barajlar ile koruma altında)
+        if (turnPoints >= 50000 || percentOfScore >= 0.50) {
+            showPraise("praise_legendary", "#e74c3c");
+        } else if (turnPoints >= 20000 || percentOfScore >= 0.30) {
+            showPraise("praise_epic", "#9b59b6");
+        } else if (turnPoints >= 8000 || percentOfScore >= 0.15) {
+            showPraise("praise_awesome", "#3498db");
+        } else if (turnPoints >= 3000 || percentOfScore >= 0.08) {
+            showPraise("praise_super", "#2ecc71");
+        } else if (turnPoints >= 1000) { 
+            showPraise("praise_good", "#f1c40f");
+        }
+    }
+}
+
+// --- YENİ: MERKEZİ PUAN TOPLAYICI (ACCUMULATOR) ---
+// --- YENİ: KUYRUK (QUEUE) SİSTEMLİ MERKEZİ PUAN TOPLAYICI ---
+// --- YENİ: KUYRUK (QUEUE) SİSTEMLİ MERKEZİ PUAN TOPLAYICI ---
+let gTally = {
+    el: null,
+    displayVal: 0,
+    totalPts: 0,
+    queue: [],
+    isProcessing: false
+};
+
+function updateTallyDisplay(f, hitType = null) {
+    f.innerText = gTally.displayVal > 0 ? `+${gTally.displayVal}` : gTally.displayVal;
+    f.style.fontSize = `${Math.min(1.5 + (Math.abs(gTally.displayVal) / 3000), 3.5)}rem`;
+    
+    // KURAL 3: Eksi puanlar HER ZAMAN kırmızı kalır!
+    if (gTally.displayVal < 0) {
+        f.style.color = '#e74c3c';
+        f.style.textShadow = '0 0 20px rgba(231, 76, 60, 0.8)';
+    } else {
+        if (hitType === 'mult') {
+            f.style.color = '#3498db'; 
+            f.style.textShadow = '0 0 20px rgba(52, 152, 219, 0.8)'; 
+        } else if (hitType === 'combo') {
+            f.style.color = '#f1c40f'; // Sarı
+            f.style.textShadow = `0 0 20px rgba(241, 196, 15, 0.8)`; 
+        } else {
+            f.style.color = '#27ae60';
+            f.style.textShadow = '0 4px 10px rgba(46, 204, 113, 0.4)';
+        }
+    }
+}
+
+function tallyPoints(basePts, animData = null, isChain = false, isChainEnd = true) {
+    gTally.queue.push({
+        basePts: basePts,
+        hits: (animData && animData.hits) ? animData.hits : [],
+        isChain: isChain,
+        isChainEnd: isChainEnd
+    });
+    
+    if (!gTally.isProcessing) {
+        processTallyQueue();
+    }
+}
+function processTallyQueue() {
+    if (gTally.queue.length === 0) {
+        gTally.isProcessing = false;
+        return;
+    }
+    gTally.isProcessing = true;
+    let currentStep = gTally.queue.shift();
+
+    if (!gTally.el) {
+        const baseF = document.getElementById('floating-score');
+        if (!baseF) { gTally.isProcessing = false; return; }
+        gTally.el = baseF.cloneNode(true);
+        gTally.el.id = 'floating-score-' + Date.now() + Math.floor(Math.random() * 1000);
+        document.body.appendChild(gTally.el);
+        
+        gTally.el.style.display = 'block';
+        gTally.el.style.opacity = '1'; 
+        gTally.el.style.transform = 'translate(-50%, -50%) scale(1)'; 
+        gTally.el.style.transition = 'none'; 
+        gTally.el.style.zIndex = '99999';
+        gTally.el.style.fontWeight = 'bold'; 
+        
+        const mainScore = document.getElementById('score');
+        const rect = mainScore.getBoundingClientRect();
+        gTally.el.style.position = 'absolute';
+        gTally.el.style.margin = '0';
+        gTally.el.style.left = `${rect.right + window.scrollX + 45}px`; 
+        gTally.el.style.top = `${rect.top + (rect.height / 2) + window.scrollY}px`;
+        
+        gTally.displayVal = 0;
+        gTally.totalPts = 0;
+    }
+
+    const f = gTally.el;
+    
+    if (currentStep.basePts !== 0) {
+        gTally.displayVal += currentStep.basePts;
+        gTally.totalPts += currentStep.basePts;
+        updateTallyDisplay(f);
+        
+        f.style.transition = 'none';
+        f.style.transform = 'translate(-50%, -50%) scale(1.5)';
+        setTimeout(() => {
+            if (f && f.parentNode) {
+                f.style.transition = 'transform 0.15s ease';
+                f.style.transform = 'translate(-50%, -50%) scale(1)';
+            }
+        }, 15);
+    }
+
+    let hitIndex = 0;
+    // METEORLAR 2 KAT HIZLANDIRILDI!
+    let meteorSpeed = currentStep.isChain ? 0.25 : 0.40; 
+    
+    function playNextHit() {
+        if (hitIndex >= currentStep.hits.length) {
+            if (currentStep.isChainEnd) {
+                setTimeout(() => finalizeGlobalTally(), 300); // 400'den 200'e düştü
+            } else {
+                setTimeout(() => processTallyQueue(), 70); // 100'den 50'ye düştü
+            }
+            return;
+        }
+        
+        let hit = currentStep.hits[hitIndex];
+        
+        const mEl = document.createElement('div');
+        mEl.className = 'fly-x-anim';
+        mEl.innerText = `x${hit.val}`;
+        mEl.style.fontSize = '2.5rem'; 
+        mEl.style.fontWeight = 'bold';
+        mEl.style.color = hit.type === 'mult' ? '#3498db' : '#f39c12';
+        mEl.style.textShadow = `0 0 15px ${mEl.style.color}`; 
+        mEl.style.position = 'absolute';
+        mEl.style.left = hit.originX + 'px';
+        mEl.style.top = hit.originY + 'px';
+        mEl.style.transform = 'scale(1)'; 
+        mEl.style.zIndex = '100000';
+        document.body.appendChild(mEl);
+
+        const fRect = f.getBoundingClientRect();
+        setTimeout(() => {
+            mEl.style.transition = `transform ${meteorSpeed}s cubic-bezier(0.55, 0.085, 0.68, 0.53), opacity ${meteorSpeed}s`;
+            const dropX = fRect.left + (fRect.width/2) - hit.originX - 20; 
+            const dropY = fRect.top + (fRect.height/2) - hit.originY - 20;
+            mEl.style.transform = `translate(${dropX}px, ${dropY}px) scale(1) rotate(15deg)`;
+
+            setTimeout(() => {
+                if (mEl.parentNode) mEl.remove();
+
+                gTally.displayVal += hit.delta;
+                gTally.totalPts += hit.delta;
+
+                f.style.transition = 'none';
+                f.style.transform = 'translate(-50%, -50%) scale(1.7)';
+                updateTallyDisplay(f, hit.type);
+                
+                if (hit.type === 'combo') {
+                    // Sarı meteorda sesi iptal ettik, onun yerine cihaz destekliyorsa 40ms titreşim verir
+                    if (navigator.vibrate) navigator.vibrate(30);
+                } else {
+                    // Mavi alan meteorunda standart sesi çalmaya devam eder (istersen bunu da silebilirsin)
+                    if(typeof SFX!=='undefined') SFX.scoreUp(); 
+                } 
+
+                setTimeout(() => {
+                    if (f && f.parentNode) {
+                        f.style.transition = `transform 0.20s ease`;
+                        f.style.transform = 'translate(-50%, -50%) scale(1)';
+                    }
+                    hitIndex++;
+                    setTimeout(playNextHit, currentStep.isChain ? 80 : 10); // Yarı yarıya düştü
+                }, 25);
+
+            }, meteorSpeed * 1000); 
+        }, 25); 
+    }
+    
+    setTimeout(playNextHit, currentStep.isChain ? 50 : 100); 
+}
+
+function finalizeGlobalTally() {
+    if (!gTally.el) return;
+    let finalPts = gTally.totalPts;
+    const f = gTally.el;
+    gTally.el = null; 
+
+    // HATA 2 ÇÖZÜMÜ: Kuyrukta bekleyen işlem varsa onu devam ettirecek "Bitiş Motoru"
+    function finishAndNext() {
+        gTally.isProcessing = false;
+        if (gTally.queue.length > 0) processTallyQueue();
+    }
+
+    let pouchFit = 0;
+    let bundleIdx = -1;
+    if (finalPts > 0 && playerJokers && playerJokers.some(j => j.type === 'bundle')) {
         for (let i = 0; i < playerJokers.length; i++) {
             if (playerJokers[i].type === 'bundle') {
                 if (playerJokers[i].amount === undefined) playerJokers[i].amount = 0;
                 let bStats = getBundleStats(score);
-                if (playerJokers[i].amount < bStats.cap) {
-                    bundleIdx = i; break;
-                }
+                if (playerJokers[i].amount < bStats.cap) { bundleIdx = i; break; }
             }
         }
         if (bundleIdx > -1) {
             let bStats = getBundleStats(score);
             let room = bStats.cap - playerJokers[bundleIdx].amount;
-            let fit = Math.min(pts, room); // Sığacak olanı al
-            
-            playerJokers[bundleIdx].amount += fit;
-            updateJokerUI(); // Barı anında doldur
-            
-            pts -= fit; // Kalanı skora gönder (eğer varsa)
-            flyPointsToPouch(fit, document.getElementById(`jk-${bundleIdx}`));
-            
-            if (pts === 0) return; // Tüm puan keseye sığdıysa burayı terk et!
+            pouchFit = Math.min(finalPts, room);
+            playerJokers[bundleIdx].amount += pouchFit;
+            updateJokerUI();
+            finalPts -= pouchFit;
         }
     }
-    // --- KESE YÖNLENDİRME SONU ---
-    const f = document.getElementById('floating-score');
 
-    const mainScore = document.getElementById('score'); // Asıl skor metni/ikonu
-    if (f && mainScore) {
-        // 1. HAYAT KURTARAN DOKUNUŞ: Elementi kapsayıcı hapsinden çıkarıp direkt body'ye alıyoruz.
-        // Böylece ekranın neresi olduğunu şaşırmayacak.
-        if (f.parentNode !== document.body) {
-            document.body.appendChild(f);
-        }
+    turnPoints += (finalPts + pouchFit); 
 
-        // 2. Asıl skorun ekrandaki kesin yerini al
-        const rect = mainScore.getBoundingClientRect();
+    if (finalPts === 0 && pouchFit > 0) {
+        const startRect = f.getBoundingClientRect();
+	flyPointsToPouch(pouchFit, document.getElementById(`jk-${bundleIdx}`), startRect);
+        f.style.opacity = '0';
+        setTimeout(() => { f.remove(); finishAndNext(); }, 300);
+        return; 
+    }
+
+    if (pouchFit > 0) {
+	const startRect = f.getBoundingClientRect();
+        flyPointsToPouch(pouchFit, document.getElementById(`jk-${bundleIdx}`), startRect);
         
-        // 3. Sayfa kaydırma (scroll) payını da ekleyerek tam koordinatı ver
-        f.style.position = 'absolute';
-        f.style.margin = '0'; // Eski CSS'ten kalan marginleri sıfırla
-        f.style.left = `${rect.right + window.scrollX + 7}px`; 
-        f.style.top = `${rect.top}px`; 
-    } 
-
-    f.innerText = pts > 0 ? `+${pts}` : pts;
-    f.style.color = pts < 0 ? '#e74c3c' : '#27ae60';
-    f.style.textShadow = pts < 0 ? '0 4px 10px rgba(231, 76, 60, 0.4)' : '0 4px 10px rgba(46, 204, 113, 0.4)';
-    f.style.fontSize = `${Math.min(1.2 + (Math.abs(pts) / 500), 3.5)}rem`;
-
-    // ----------------------------------------------------
-    // YENİ: PUANA GÖRE DİNAMİK HIZ HESAPLAMASI
-    // ----------------------------------------------------
-    let absPts = Math.abs(pts);
-    let collectTime = 900; // Varsayılan Ekranda Kalma Süresi (Büyük puanlar için)
-    let flyTime = 400;     // Varsayılan Skora Uçma Süresi
-    let animSpeed = "0.7s"; // Varsayılan CSS Büyüme Hızı
-
-    if (absPts < 100) {
-        // ÇOK KÜÇÜK PUANLAR (Sadece Blok Koyma vb.): Çok Hızlı
-        collectTime = 250; 
-        flyTime = 250;
-        animSpeed = "0.4s";
-    } else if (absPts < 500) {
-        // ORTA HALLİ PUANLAR (1-2 Satır Kırma): Standart Hız
-        collectTime = 500;
-        flyTime = 350;
-        animSpeed = "0.6s";
-    }
-    
-    // CSS'teki transition süresini JS ile anlık olarak eziyoruz
-    f.style.transition = `transform ${animSpeed} cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity ${parseFloat(animSpeed)/2}s`;
-
-    f.classList.remove('flying');
-    f.classList.add('collecting');
-
-    if (pts >= 1000 && pts < 10000) {
-        if (pts < 3000) {
-            showPraise(["GÜZEL!", "SÜPER!", "BÖYLE DEVAM ET!"][Math.floor(Math.random() * 3)], "#2ecc71");
-        } else if (pts < 5000) {
-            showPraise(["MUHTEŞEM!!", "HARİKA!!"][Math.floor(Math.random() * 2)], "#3498db");
-        } else if (pts < 20000) {
-            showPraise(["EŞSİZ!!!", "DEHA!!"][Math.floor(Math.random() * 2)], "#9b59b6");
-        } else if (pts < 50000) {
-            showPraise("MEGA!!", "#f1c40f");
-        } else {
-            showPraise("ULTİMATE!!", "#e74c3c");
+        // BUNDLE SMOOTH GEÇİŞİ: Kese puanları uçmaya başlarken, ana skoru güncelleyip bekletiyoruz
+        if (finalPts > 0) {
+            setTimeout(() => {
+                f.innerText = `+${finalPts}`; // Kalan rakamı güncelle
+                f.style.transform = 'translate(-50%, -50%) scale(1.4)'; // Hafif pop efekti
+                setTimeout(() => f.style.transform = 'translate(-50%, -50%) scale(1)', 150);
+            }, 300); // Keseye giden sayının ayrılma süresiyle senkronize
         }
     }
 
-    // Bekleme Süresi (collectTime) dolunca skora doğru uçur
-    setTimeout( () => {
-        f.classList.remove('collecting');
-        f.classList.add('flying');
-        
-        // Uçuş hızını da dinamik olarak CSS'e ver
-        f.style.transition = `transform ${(flyTime/1000).toFixed(2)}s ease-in, opacity ${(flyTime/1000).toFixed(2)}s ease-in`;
+    if (finalPts === 0) {
+        f.style.opacity = '0';
+        setTimeout(() => { f.remove(); finishAndNext(); }, 300);
+        return;
+    }
 
-        // Uçuş Süresi (flyTime) dolunca ana skora ekle
-        setTimeout( () => {
-            score += pts;
+    // SMOOTH GEÇİŞ ZAMANLAMASI: Keseye puan gittiyse ana skora uçmak için 600ms bekle, gitmediyse direkt 100ms'de uç
+    let delayToMainScore = (pouchFit > 0) ? 600 : 100;
+
+    setTimeout(() => {
+        const targetScore = document.getElementById('score');
+        const targetRect = targetScore.getBoundingClientRect();
+        const startRect = f.getBoundingClientRect();
+        
+        const dropX = targetRect.left + (targetRect.width / 2) - (startRect.left + startRect.width / 2);
+        const dropY = targetRect.top + (targetRect.height / 2) - (startRect.top + startRect.height / 2);
+
+        f.style.transition = `transform 0.4s ease-in, opacity 0.4s ease-in`;
+        f.style.transform = `translate(calc(-50% + ${dropX}px), calc(-50% + ${dropY}px)) scale(0.3)`;
+        f.style.opacity = '0';
+
+        setTimeout(() => {
+            score += finalPts;
             score = Math.max(0, score);
-            if (typeof window.playDynamicSound === 'function') window.playDynamicSound('score', pts);
-            document.getElementById('score').innerText = formatScore(score);
-            let s = document.getElementById('score');
-            s.style.transform = 'scale(1.3)';
-            setTimeout( () => s.style.transform = 'scale(1)', 200);
-        }, flyTime);
+            if (typeof window.playDynamicSound === 'function') window.playDynamicSound('score', finalPts);
+            targetScore.innerText = formatScore(score);
+            
+            targetScore.style.transition = 'transform 0.15s';
+            targetScore.style.transform = 'scale(1.3)';
+            setTimeout(() => targetScore.style.transform = 'scale(1)', 150);
+            
+            f.remove(); 
+            finishAndNext(); 
+        }, 400);
         
-    }, collectTime);
+    }, delayToMainScore); // Bekleme süresi dinamik yapıldı
+ 
 }
-
 function updateChestUI() {
     const stack = document.getElementById('key-stack');
     stack.innerHTML = '';
@@ -2726,9 +3279,11 @@ function updateMultUI() {
     const m = document.getElementById('mult-info');
     if (activeMultiplier.turns > 0) {
         m.style.opacity = '1';
+        m.classList.add('active');
         document.getElementById('mult-turns').innerText = activeMultiplier.turns;
     } else {
         m.style.opacity = '0';
+        m.classList.remove('active');
         activeMultiplier.active = false;
     }
 }
@@ -2755,25 +3310,26 @@ function openMegaChest() {
     shift = Math.min(shift, CHEST_TIERS.length - 4);
     let maxPts = CHEST_TIERS[shift + 3]; // Havuzdaki 4. (en büyük) ihtimali alır
 
-    // 2. KESE KONTROLLÜ JOKER SEÇİMİ
+    
+    // 2. KESE KONTROLLÜ VE STACK KONTROLLÜ JOKER SEÇİMİ
     let availableJokers = ['hammer', 'shuffle', 'undo', '1x1'];
     
-    // Oyuncunun elinde zaten kese YOKSA, mega sandık joker havuzuna keseyi ekle
     if (!playerJokers.some(j => j.type === 'bundle')) {
         availableJokers.push('bundle');
     }
 
-    let guaranteedJoker = {
-        type: 'joker',
-        val: availableJokers[Math.floor(Math.random() * availableJokers.length)]
-    };
+    availableJokers = availableJokers.filter(jt => {
+        let ex = playerJokers.find(pj => pj.type === jt);
+        if (!ex) return playerJokers.length < 3; // Boş slot varsa alır
+        let maxStack = (jt === '1x1') ? 6 : (jt === 'bundle' ? 1 : 3);
+        return (ex.count || 1) < maxStack;
+    });
 
-    // Eğer oyuncunun 3 joker slotu da doluysa jokeri puana (yine en yüksek puana) çevir
-    if (playerJokers.length >= 3) {
-        guaranteedJoker = {
-            type: 'pts',
-            val: maxPts 
-        };
+    let guaranteedJoker;
+    if (availableJokers.length === 0) {
+        guaranteedJoker = { type: 'pts', val: maxPts };
+    } else {
+        guaranteedJoker = { type: 'joker', val: availableJokers[Math.floor(Math.random() * availableJokers.length)] };
     }
 
     // 3. KLASİK GANİMETLERİ FIRLAT (1000 yerine maxPts kullanıyoruz)
@@ -2799,7 +3355,7 @@ function transformRandomBlockToSpecial() {
     for (let r = 0; r < 9; r++) {
         for (let c = 0; c < 9; c++) {
             let type = boardState[r][c];
-            if (type === 1 || curses.includes(type)) {
+            if ((type === 1 || curses.includes(type)) && !(iceState[r] && iceState[r][c])) {
                 validTargets.push({ r, c });
             }
         }
@@ -2951,32 +3507,33 @@ function popOutLoot(loot, delay) {
                             setTimeout( () => {
                                 if (lootEl.parentNode)
                                     lootEl.remove();
+                                let deferFinalize = false;
                                 if (loot.type === 'pts') {
-                                    let finalPts = loot.val * combo;
-                                    if (activeMultiplier.active && activeMultiplier.turns > 0) {
-                                        activeAnimations++;
-                                        let flyX = document.createElement('div');
-                                        flyX.className = 'fly-x-anim';
-                                        flyX.innerText = `x${activeMultiplier.value}`;
-                                        flyX.style.left = (targetRect.left + 40) + 'px';
-                                        flyX.style.top = (targetRect.top - 40) + 'px';
-                                        document.body.appendChild(flyX);
-                                        setTimeout( () => {
-                                            flyX.style.transform = `translate(-40px, 40px) scale(0.5)`;
-                                            flyX.style.opacity = '0';
-                                        }
-                                        , 50);
-                                        setTimeout( () => {
-                                            if (flyX.parentNode)
-                                                flyX.remove();
-                                            tallyPoints(finalPts * activeMultiplier.value);
-                                            activeAnimations--;
-                                            finalizeTurn();
-                                        }
-                                        , 850);
-                                    } else {
-                                        tallyPoints(finalPts);
+                                    // Puan loot'ları artık kuyruğa entegre!
+                                    let appliedCombo = combo;
+                                    let effCombo = (activeMultiplier.active && activeMultiplier.turns > 0) ? (appliedCombo * activeMultiplier.value) : appliedCombo;
+                                    let currentPts = loot.val;
+                                    let hits = [];
+                                    
+                                    if (effCombo >= 2) {
+                                        currentPts = loot.val * effCombo;
+                                        const cEl = document.getElementById('combo-display') || targetRect;
+                                        const cRect = cEl.getBoundingClientRect ? cEl.getBoundingClientRect() : cEl;
+                                        hits.push({
+                                            val: effCombo,
+                                            type: 'combo',
+                                            originX: cRect.left + (cRect.width / 2) - 10 || targetRect.left + 40,
+                                            originY: cRect.top + (cRect.height / 2) - 25 || targetRect.top - 40,
+                                            delta: currentPts - loot.val
+                                        });
                                     }
+                                    
+                                    // 4 Parametreyle gönder
+                                    tallyPoints(loot.val, { hits: hits }, false, true);
+                                    
+                                    activeAnimations--;
+                                    finalizeTurn();
+                                    
                                 } else if (loot.type === 'mult') {
                                     let newMultValue = getMultValue(gameState.chestOddsLevel);
 
@@ -3006,16 +3563,21 @@ if (typeof updateComboUI === 'function') {
         setTimeout(() => comboBox.classList.remove('pop'), 500);
     }
                                 } else if (loot.type === 'joker') {
-                                    let jData = {
-                                        type: loot.val
-                                    };
-                                    if (jData.type === '1x1')
-                                        jData.count = 3;
-                                    playerJokers.push(jData);
-                                    updateJokerUI();
+    let maxStack = (loot.val === '1x1') ? 6 : (loot.val === 'bundle' ? 1 : 3);
+    let existing = playerJokers.find(j => j.type === loot.val);
+    if (existing) {
+        let addAmt = (loot.val === '1x1') ? 3 : 1;
+        existing.count = (existing.count || 1) + addAmt;
+        if (existing.count > maxStack) existing.count = maxStack;
+    } else if (playerJokers.length < 3) {
+        playerJokers.push({ type: loot.val, count: (loot.val === '1x1' ? 3 : 1) });
+    }
+    updateJokerUI();
+}
+                                if (!deferFinalize) {
+                                    activeAnimations--;
+                                    finalizeTurn();
                                 }
-                                activeAnimations--;
-                                finalizeTurn();
                             }
                             , 600);
                         }
@@ -3042,74 +3604,115 @@ function getJokerTooltipDesc(type) {
 function updateJokerUI() {
     for (let i = 0; i < 3; i++) {
         const slot = document.getElementById(`jk-${i}`);
-        slot.innerHTML = '';
+        
+        // GÜVENLİ TEMİZLEME: innerHTML = '' yerine textContent kullanıyoruz
+        slot.textContent = ''; 
         slot.className = 'joker-slot';
         slot.onclick = null;
         slot.onpointerdown = null;
+
         if (playerJokers[i]) {
             slot.classList.add('has-item');
             let t = playerJokers[i].type;
             let path = `icons/${t}.png`;
             let fallback = '';
-            
-            // 1. DÜZELTME: Değişkeni bloğun en başında BOŞ olarak tanımlıyoruz ki hata vermesin
-            let tooltipHtml = '';
 
-            if (t === 'hammer')
-                fallback = '🔨';
-            else if (t === 'shuffle')
-                fallback = '🔀';
-            else if (t === 'undo')
-                fallback = '↩️';
-            else if (t === '1x1') {
-                fallback = '🟩';
-                slot.innerHTML += `<div class="joker-badge">${playerJokers[i].count}</div>`;
-            }
-            else if (t === 'bundle') {
+            if (t === 'hammer') fallback = '🔨';
+            else if (t === 'shuffle') fallback = '🔀';
+            else if (t === 'undo') fallback = '↩️';
+            else if (t === '1x1') fallback = '🟩';
+
+            // 1. Kese Barı (Progress Bar) Güvenli DOM Oluşturma
+            if (t === 'bundle') {
                 if (playerJokers[i].amount === undefined) playerJokers[i].amount = 0;
                 let bStats = getBundleStats(score);
                 path = `icons/bundle${bStats.level}.png`;
                 fallback = '💰';
-                
-                let amtFmt = formatScore(playerJokers[i].amount);
-                let capFmt = formatScore(bStats.cap);
+
                 let pct = Math.min(100, (playerJokers[i].amount / bStats.cap) * 100);
                 
-                let tipText = "";
-                if (playerJokers[i].readyToCash) {
-                    // İkinci tıklamaya hazır hali
-                    tipText = `<span style="color:#f1c40f; font-size:1.4em; font-weight:bold;">${amtFmt}</span><br><span style="font-size:0.85em; color:#fff;">${typeof t === 'function' ? t('bundle_cash_prompt') : 'Skora eklemek için bas'}</span>`;
-                } else {
-                    // Normal bilgi hali
-                    tipText = `${getJokerTooltipDesc(t)}<br><span style="color:#f1c40f; font-size:1.1em; font-weight:bold; display:block; margin-top:5px;">${amtFmt} / ${capFmt}</span>`;
-                }
+                const progressContainer = document.createElement('div');
+                progressContainer.style.cssText = "position:absolute; bottom:2px; left:10%; width:80%; height:5px; background:rgba(0,0,0,0.6); border-radius:3px; pointer-events:none; z-index:5;";
                 
-                // KESE İÇİN ÖZEL AÇIKLAMAYI ATIYORUZ
-                tooltipHtml = `<div class="special-tooltip">${tipText}</div>`;
+                const progressBar = document.createElement('div');
+                progressBar.style.cssText = `width:${pct}%; height:100%; background:#f1c40f; border-radius:3px; transition:width 0.3s;`;
                 
-                // ProgressBar HTML'ini yuvanın içine gömüyoruz
-                slot.innerHTML += `
-                    <div style="position:absolute; bottom:2px; left:10%; width:80%; height:5px; background:rgba(0,0,0,0.6); border-radius:3px; pointer-events:none; z-index:5;">
-                        <div style="width:${pct}%; height:100%; background:#f1c40f; border-radius:3px; transition:width 0.3s;"></div>
-                    </div>`;
-            }
-            
-            // 2. DÜZELTME: Eğer üstte kese için atama yapılmadıysa (değişken hala boşsa) standart açıklamayı çek
-            if (tooltipHtml === '') {
-                tooltipHtml = `<div class="special-tooltip">${getJokerTooltipDesc(t)}</div>`;
+                progressContainer.appendChild(progressBar);
+                slot.appendChild(progressContainer);
             }
 
-            slot.innerHTML += `<img src="${path}" class="custom-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><div style="display:none; font-size:1.5rem;">${fallback}</div>${tooltipHtml}`;
-            
+            // 2. Stack Rozeti (Badge) Güvenli DOM Oluşturma
+            if (t !== 'bundle') {
+                let count = playerJokers[i].count || 1;
+                const badgeDiv = document.createElement('div');
+                badgeDiv.className = 'joker-badge';
+                badgeDiv.textContent = count;
+                slot.appendChild(badgeDiv);
+            }
+
+            // 3. İkon Resmini ve Yedek Emojiyi Eklemek
+            const iconImg = document.createElement('img');
+            iconImg.src = path;
+            iconImg.className = 'custom-icon';
+            iconImg.onerror = function() {
+                this.style.display = 'none';
+                if (this.nextElementSibling) this.nextElementSibling.style.display = 'block';
+            };
+            slot.appendChild(iconImg);
+
+            const fallbackDiv = document.createElement('div');
+            fallbackDiv.style.display = 'none';
+            fallbackDiv.style.fontSize = '1.5rem';
+            fallbackDiv.textContent = fallback;
+            slot.appendChild(fallbackDiv);
+
+            // 4. Akıllı Tooltip (Açıklama) Güvenli DOM Oluşturma
+            const tooltipDiv = document.createElement('div');
+            tooltipDiv.className = 'special-tooltip';
+
+            if (t === 'bundle') {
+                let bStats = getBundleStats(score);
+                let amtFmt = formatScore(playerJokers[i].amount);
+                let capFmt = formatScore(bStats.cap);
+
+                const amtSpan = document.createElement('span');
+                amtSpan.style.color = '#f1c40f';
+                amtSpan.style.fontWeight = 'bold';
+                amtSpan.textContent = amtFmt;
+
+                if (playerJokers[i].readyToCash) {
+                    amtSpan.style.fontSize = '1.4em';
+                    tooltipDiv.appendChild(amtSpan);
+                    tooltipDiv.appendChild(document.createElement('br'));
+                    
+                    const promptSpan = document.createElement('span');
+                    promptSpan.style.fontSize = '0.85em';
+                    promptSpan.style.color = '#fff';
+                    promptSpan.textContent = typeof t === 'function' ? t('bundle_cash_prompt') : 'Skora eklemek için bas';
+                    tooltipDiv.appendChild(promptSpan);
+                } else {
+                    tooltipDiv.textContent = getJokerTooltipDesc(t);
+                    tooltipDiv.appendChild(document.createElement('br'));
+                    
+                    amtSpan.textContent = `${amtFmt} / ${capFmt}`;
+                    amtSpan.style.fontSize = '1.1em';
+                    amtSpan.style.display = 'block';
+                    amtSpan.style.marginTop = '5px';
+                    tooltipDiv.appendChild(amtSpan);
+                }
+            } else {
+                tooltipDiv.textContent = getJokerTooltipDesc(t);
+            }
+
+            slot.appendChild(tooltipDiv);
         }
     }
 }
 function activateJoker(idx) {
-    if (isGameOverSequence || activeAnimations > 0)
-        return;
+    if (isGameOverSequence || activeAnimations > 0) return;
     let j = playerJokers[idx];
-    if (!j)
-        return;
+    if (!j) return;
+    
     if (activeJokerMode) {
         activeJokerMode = null;
         hammerLockedPos = null;
@@ -3118,92 +3721,94 @@ function activateJoker(idx) {
         clearGhost();
         return;
     }
+    
     if (j.type === 'undo') {
- 	if(typeof SFX!=='undefined') SFX.undo();
-        if (!historyState)
-            return;
+        if(typeof SFX!=='undefined') SFX.undo();
+        if (!historyState) return;
+        
         boardState = historyState.board.map(row => [...row]);
+        iceState = (historyState.ice || Array(boardSize).fill().map( () => Array(boardSize).fill(false))).map(row => [...row]);
         currentPiecesData = JSON.parse(JSON.stringify(historyState.pieces));
         combo = historyState.combo;
         gameState = JSON.parse(JSON.stringify(historyState.gs));
         document.getElementById('base-score-val').innerText = gameState.baseBlockScore;
         totalTurns = historyState.totalTurns;
         specialBlockStates = JSON.parse(JSON.stringify(historyState.specialStates));
+        
         let oldTurns = (historyState.mult && historyState.mult.active) ? historyState.mult.turns : 0;
         let curTurns = activeMultiplier.active ? activeMultiplier.turns : 0;
-        if (oldTurns > curTurns)
-            activeMultiplier = {
-                ...historyState.mult
-            };
+        if (oldTurns > curTurns) {
+            activeMultiplier = { ...historyState.mult };
+        }
+        
         score -= (historyState.earnedPoints || 0);
         rawScore = Math.max(0, rawScore - (historyState.earnedPoints > 0 ? 5 : 0));
         document.getElementById('score').innerText = formatScore(score);
+        
         if (historyState.earnedKeys) {
             playerKeys -= historyState.earnedKeys;
-            if (playerKeys < 0)
-                playerKeys = 0;
+            if (playerKeys < 0) playerKeys = 0;
         }
+        
         updateComboUI();
         updateChestUI();
         updateMultUI();
         renderPieces();
         updateTrayPiecesState();
         updateBoardVisually();
-        playerJokers.splice(idx, 1);
+        
+        // STACK DÜŞÜRME
+        playerJokers[idx].count = (playerJokers[idx].count || 1) - 1;
+        if(playerJokers[idx].count <= 0) playerJokers.splice(idx, 1);
+        
         updateJokerUI();
         historyState = null;
         saveGameState();
         checkGameOver();
+        
     } else if (j.type === 'shuffle') {
         generatePieces(true);
-        playerJokers.splice(idx, 1);
+        
+        // STACK DÜŞÜRME
+        playerJokers[idx].count = (playerJokers[idx].count || 1) - 1;
+        if(playerJokers[idx].count <= 0) playerJokers.splice(idx, 1);
+        
         updateJokerUI();
         saveGameState();
         checkGameOver();
-    }else if (j.type === 'bundle') {
-	
-        if (j.amount === undefined || j.amount === 0) {
-            
-            return;
-        }
+        
+    } else if (j.type === 'bundle') {
+        if (j.amount === undefined || j.amount === 0) return;
         
         if (!j.readyToCash) {
-            // İlk Dokunuş: Bozdurma moduna geç ve UI'ı güncelle
-	              
             j.readyToCash = true;
-            // Diğer keselerin hazır modunu iptal et
             playerJokers.forEach(pj => { if(pj !== j) pj.readyToCash = false; });
             updateJokerUI();
             
-            // YENİ EKLENEN KISIM: Tıklar tıklamaz Pop-up'ı zorla göster!
             let slotEl = document.getElementById(`jk-${idx}`);
             let tooltipEl = slotEl.querySelector('.special-tooltip');
             if (tooltipEl && typeof window.showSmartTooltip === 'function') {
                 window.showSmartTooltip(slotEl, tooltipEl.innerHTML);
-                
-                // Oyuncunun ekranını işgal etmemesi için 3 saniye sonra otomatik gizle
                 setTimeout(() => {
                     if (typeof window.hideSmartTooltip === 'function') window.hideSmartTooltip();
                 }, 3000);
             }
             return;
         }
-       
-        // İkinci Dokunuş: PATLAT VE SKORA EKLE!
-        if (typeof window.hideSmartTooltip === 'function') window.hideSmartTooltip(); // Patlatırken pop-up'ı anında gizle
+        
+        if (typeof window.hideSmartTooltip === 'function') window.hideSmartTooltip(); 
         
         let finalPts = j.amount * combo;
-	if (activeMultiplier.active && activeMultiplier.turns > 0) {
+        if (activeMultiplier.active && activeMultiplier.turns > 0) {
             finalPts *= activeMultiplier.value;
-	}
+        }
         let slotEl = document.getElementById(`jk-${idx}`);
         
-        // Sarı özel animasyonu çağır
         if (typeof tallyBundlePoints === 'function') {
             tallyBundlePoints(finalPts, slotEl);
+	    jokerUsedThisTurn = true;
         }
         
-        // Keseyi jokerlerden sil
         playerJokers.splice(idx, 1);
         updateJokerUI();
         saveGameState();
@@ -3225,6 +3830,9 @@ function updateBoardVisually() {
                     cell.innerHTML = getIconHTML(type, r, c);
                     if (['scoreDown', 'skull', 'cursedKey', 'minus'].includes(type))
                         cell.classList.add('cursed-cell');
+                }
+                if (iceState[r] && iceState[r][c]) {
+                    cell.prepend(createIceOverlayFragment(type, r, c));
                 }
             }
         }
@@ -3368,44 +3976,8 @@ window.returnToMainMenu = function() {
         });
     }
     
-    // İstatistik panelini kapat, yeni menüyü tetikle
-    closeStats(); 
+        closeStats(); 
 };
-
-// 2. TERTEMİZ BAŞLANGIÇ EKRANI (Sayfa ilk yüklendiğinde ve Ana Menüde çalışır)
-function initInteractiveStart() {
-    isGameOverSequence = false;
-
-    // Animasyonlu merkezi skoru gizle, normal oyun öğelerini geri getir
-    if(document.getElementById('final-score-centered-display')) {
-        document.getElementById('final-score-centered-display').style.display = 'none';
-        document.getElementById('final-score-centered-display').style.animation = 'none';
-    }
-    if(document.getElementById('normal-game-elements-left')) {
-        document.getElementById('normal-game-elements-left').style.opacity = '1';
-    }
-    if(document.getElementById('normal-game-extras-right')) {
-        document.getElementById('normal-game-extras-right').style.display = 'flex';
-    }
-
-    document.getElementById('board').style.filter = "none";
-    document.getElementById('board-stats-overlay').classList.remove('show');
-    document.getElementById('in-board-stats-content').classList.remove('show');
-
-    if (document.getElementById('close-stats-btn')) {
-        document.getElementById('close-stats-btn').style.display = 'none';
-    }
-
-    startDragWrapper.style.visibility = 'visible';
-    startDragWrapper.style.transform = 'translate(0px, 0px) scale(1)';
-
-    if (document.getElementById('start-drag-wrapper').parentElement) {
-        document.getElementById('start-drag-wrapper').parentElement.style.display = 'flex';
-    }
-
-    setGameState('START');
-    startIdleAnimation();
-}
 
 // 3. YENİ: TEKRAR OYNA BUTONUNA BASILINCA DİREKT OYUNA GİREN SİSTEM
 window.playAgainDirectly = function() {
@@ -3615,6 +4187,146 @@ function checkDeviceOrientation() {
 window.addEventListener('resize', checkDeviceOrientation);
 window.addEventListener('orientationchange', checkDeviceOrientation);
 
+// ==========================================
+// BUZ PARTİKÜL MOTORU (Sürükleme ve Patlama)
+// ==========================================
+const pCanvas = document.getElementById('particleCanvas');
+const pCtx = pCanvas ? pCanvas.getContext('2d') : null;
+let iceParticles = [];
+
+function resizeParticleCanvas() {
+    if (pCanvas) {
+        pCanvas.width = window.innerWidth;
+        pCanvas.height = window.innerHeight;
+    }
+}
+window.addEventListener('resize', resizeParticleCanvas);
+resizeParticleCanvas();
+
+class IceParticle {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        
+        // Patlama efekti daha büyük, sürükleme daha küçük
+        this.size = type === 'burst' ? Math.random() * 7 + 4 : Math.random() * 4 + 2;
+        
+        // Hız ayarları (Patlama her yöne hızlı, sürükleme yavaş ve hafifçe yukarı/saçılma)
+        if (type === 'burst') {
+            this.speedX = (Math.random() - 0.5) * 15;
+            this.speedY = (Math.random() - 0.5) * 15;
+            this.lifespan = Math.random() * 50 + 60; 
+        } else {
+            this.speedX = (Math.random() - 0.5) * 2;
+            this.speedY = (Math.random() * 1) - 1.5; // Hafif yukarı doğru tüter
+            this.lifespan = Math.random() * 40 + 40; 
+        }
+        
+        const hue = Math.floor(Math.random() * 30 + 190); // Açık mavi / Camgöbeği
+        const lightness = Math.floor(Math.random() * 20 + 70); 
+        this.color = `hsl(${hue}, 100%, ${lightness}%)`;
+        
+        this.age = 0;
+        this.opacity = type === 'burst' ? 1 : 0; // Patlama anında görünür, sürüklemede solarak belirir
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.age++;
+
+        if (this.type === 'burst') {
+            // Patlama direkt solmaya başlar
+            this.opacity -= 1 / this.lifespan;
+        } else {
+            // Sürükleme efekti önce belirir, sonra solar
+            if (this.age < this.lifespan * 0.3) this.opacity += 1 / (this.lifespan * 0.3);
+            else if (this.age > this.lifespan * 0.6) this.opacity -= 1 / (this.lifespan * 0.4);
+        }
+        
+        this.opacity = Math.max(0, Math.min(1, this.opacity));
+    }
+
+    draw() {
+        if (!pCtx) return;
+        pCtx.save();
+        pCtx.globalAlpha = this.opacity;
+        pCtx.fillStyle = this.color;
+        pCtx.fillRect(this.x, this.y, this.size, this.size);
+        pCtx.restore();
+    }
+}
+
+window.spawnIceParticle = function(x, y, type) {
+    iceParticles.push(new IceParticle(x, y, type));
+};
+
+function animateIceParticles() {
+    if (pCtx) {
+        pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+        for (let i = 0; i < iceParticles.length; i++) {
+            iceParticles[i].update();
+            iceParticles[i].draw();
+            if (iceParticles[i].age >= iceParticles[i].lifespan || iceParticles[i].opacity <= 0) {
+                iceParticles.splice(i, 1);
+                i--;
+            }
+        }
+    }
+    requestAnimationFrame(animateIceParticles);
+}
+animateIceParticles();
+// ----------------------------------------------------
+// PWA INSTALL PROMPT & iOS TUTORIAL LOGIC
+// ----------------------------------------------------
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) installBtn.style.display = 'block';
+});
+
+window.installPWA = function() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            deferredPrompt = null;
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) installBtn.style.display = 'none';
+        });
+    }
+};
+
+function showIosInstallTutorial() {
+    const isIos = () => {
+        const userAgent = window.navigator.userAgent.toLowerCase();
+        return /iphone|ipad|ipod/.test(userAgent);
+    };
+    
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    
+    if (isIos() && !isStandalone && !localStorage.getItem('ios_tut_shown')) {
+        const iosPopup = document.createElement('div');
+        iosPopup.style.cssText = `
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(255,255,255,0.95); color: #2c3e50; padding: 15px;
+            border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            text-align: center; font-size: 0.9rem; font-weight: bold; z-index: 100000;
+            width: 80%; max-width: 300px;
+        `;
+        iosPopup.innerHTML = `
+            Daha iyi bir deneyim için Blockmania'yı yükle!<br><br>
+            Alt menüdeki <b>Paylaş</b> ikonuna dokun ve <br>
+            <span style="color:#3498db;">"Ana Ekrana Ekle"</span> seçeneğini seç.<br>
+            <button onclick="this.parentElement.remove(); localStorage.setItem('ios_tut_shown', '1');" style="margin-top:10px; padding:5px 15px; border:none; background:#e74c3c; color:white; border-radius:6px; font-weight:bold; cursor:pointer;">Kapat</button>
+        `;
+        document.body.appendChild(iosPopup);
+    }
+}
+
+window.addEventListener('load', showIosInstallTutorial);
 // Oyun ilk açıldığında da bir kez kontrol et
 checkDeviceOrientation();
 
