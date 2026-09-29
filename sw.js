@@ -1,7 +1,12 @@
-const CACHE_NAME = 'BlockMania-v2.16';
+const CACHE_NAME = 'BlockMania-v6';
 
-// Oyunun çevrimdışı çalışabilmesi için ZORUNLU olan tüm dosyalar
-// Not: "offline.html" dosyasını da bu listeye ekledik.
+// Oyunun ÇEVRİMDIŞI AÇILABİLMESİ için gereken minimum iskelet.
+// Buradaki her dosya kurulum anında indirilip bloke eder, bu yüzden liste
+// kasıtlı olarak dar tutuldu. Geri kalan her şey (yüksek seviye sandık
+// ikonları, efektler, arka plan 2-5, tüm ses dosyaları) aşağıdaki fetch
+// handler'ındaki dinamik önbellekleme sayesinde, oyuncu onları normal
+// oynanış sırasında gerçekten istediği an otomatik olarak önbelleğe
+// alınıyor — kuruluşta hepsini birden indirmeye gerek yok.
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -9,7 +14,7 @@ const ASSETS_TO_CACHE = [
   './style.css',
   './manifest.json',
   './dictionary.json',
-  
+
   // JavaScript Dosyaları
   './loading.js',
   './shapes.js',
@@ -18,33 +23,26 @@ const ASSETS_TO_CACHE = [
   './game.js',
   './sound.js',
   './tutorial.js',
-  
-  // Ana Görseller
-  './blockmania.png',
-  './assets/crack.png',
-  
-  // İkonlar (loading.js'den çekildi)
-  './icons/chest.png', './icons/key.png', './icons/key_block.png', 
-  './icons/hammer.png', './icons/shuffle.png', './icons/undo.png', 
-  './icons/1x1.png', './icons/pts.png', './icons/mult.png', 
-  './icons/cross.png', './icons/row.png', './icons/col.png', 
-  './icons/random.png', './icons/M.png', './icons/X.png', 
-  './icons/life.png', './icons/multX.png', './icons/upg.png', 
-  './icons/scoreUp.png', './icons/scoreDown.png', './icons/skull.png', 
-  './icons/cursedKey.png', './icons/minus.png', './icons/hammer_icon.png', 
-  './icons/bundle1.png', './icons/bundle2.png', './icons/bundle3.png', 
-  './icons/bundle4.png',
 
-  // Ses Dosyaları (sound.js'den çekildi - en önemlileri)
-  './sounds/bg_loop.mp3', './sounds/place1.mp3', './sounds/place2.mp3', 
-  './sounds/place3.mp3', './sounds/place4.mp3', './sounds/place5.mp3', 
-  './sounds/combo_1.mp3', './sounds/combo_2.mp3', './sounds/combo_3.mp3', 
-  './sounds/new_tray.mp3', './sounds/chest_open.mp3', './sounds/chest_upgrade.mp3', 
-  './sounds/area_destroy.mp3', './sounds/hammer_crack.mp3', './sounds/minus_laugh.mp3', 
-  './sounds/big_score_1.mp3', './sounds/big_score_2.mp3', './sounds/big_score_3.mp3', 
-  './sounds/undo.mp3', './sounds/key.mp3', './sounds/game_over.mp3', 
-  './sounds/score_up.mp3', './sounds/score_down.mp3', './sounds/random_block.mp3', 
-  './sounds/life.mp3'
+  // Ana Görsel
+  './blockmania.png',
+
+  // İlk açılışta gösterilen tek arka plan (pc + mobile) — 2-5 dinamik önbelleğe düşer
+  './backgrounds/background1_pc.png', './backgrounds/background1_mobile.png',
+
+  // Oyunun ilk birkaç hamlesi için gereken ikonlar
+  './icons/chest.png', './icons/chest1.png',
+  './icons/key.png', './icons/key_block.png',
+  './icons/hammer.png', './icons/shuffle.png', './icons/undo.png',
+  './icons/1x1.png', './icons/pts.png', './icons/mult.png',
+  './icons/cross.png', './icons/row.png', './icons/col.png',
+  './icons/random.png', './icons/M.png', './icons/X.png',
+  './icons/life.png', './icons/multX.png', './icons/upg.png',
+  './icons/scoreUp.png', './icons/scoreDown.png', './icons/skull.png',
+  './icons/cursedKey.png', './icons/minus.png', './icons/hammer_icon.png',
+  './icons/bundle1.png', './icons/bundle2.png', './icons/bundle3.png',
+  './icons/bundle4.png', './icons/ice.png',
+  './icons/megachest_describe.png', './icons/megacombo.png', './icons/multiway.png',
 ];
 
 // 1. KURULUM (Install) - Statik dosyaları önbelleğe al
@@ -97,6 +95,9 @@ self.addEventListener('fetch', event => {
         }
 
         // Başarılı yanıtı klonla ve sonradan kullanılmak üzere önbelleğe ekle (Dinamik Caching)
+        // Bu sayede yüksek seviye sandık ikonları, efektler, diğer arka
+        // planlar ve tüm ses dosyaları — oyuncu onları gerçekten
+        // tetiklediği an, kurulumu hiç bloke etmeden buradan önbelleğe düşer.
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then(cache => {
           cache.put(event.request, responseToCache);
@@ -109,7 +110,7 @@ self.addEventListener('fetch', event => {
         if (event.request.mode === 'navigate' || event.request.headers.get('accept').includes('text/html')) {
           return caches.match('./offline.html');
         }
-        
+
         // Eğer eksik olan şey bir görselse, istersen buraya bir placeholder görsel döndürebilirsin.
         // return caches.match('./icons/fallback_image.png');
       });
