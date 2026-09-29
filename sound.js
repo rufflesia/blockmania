@@ -33,19 +33,19 @@ window.SFX = (function () {
     'use strict';
      // --- YENİ: MİKSERDEN GELEN ÖZEL SES SEVİYELERİ ---
     const customVolumes = {
-        "place1": 1,
-        "place2": 1,
-        "place3": 1,
-        "place4": 1,
-        "place5": 1,
-        "combo1": 0.21,
-        "combo2": 0.17,
-        "combo3": 0.17,
-        "combo4": 0.16,
-        "combo5": 0.18,
-        "add_score": 0.05,
-        "add_bundle": 0.67
-    };
+    "place1": 1,
+    "place2": 1,
+    "place3": 1,
+    "place4": 1,
+    "place5": 1,
+    "combo1": 0.31,
+    "combo2": 0.20,
+    "combo3": 0.20,
+    "combo4": 0.20,
+    "combo5": 0.20,
+    "add_score": 0.2,
+    "add_bundle": 0.67
+};
 
     // ── AUDIO CONTEXT (lazy init to satisfy autoplay policy) ──
     let ctx = null;
@@ -93,7 +93,7 @@ function load(name) {
         
         // YENİ IDM TAKTİĞİ: Header yerine URL sonuna sahte bir parametre ekliyoruz.
         // Bu sayede IDM dosyanın saf bir .mp3 olduğunu anlayamıyor ve tarayıcı da sorunsuz okuyor.
-        return fetch(`sounds/${name}.mp3?v=${Date.now()}`)
+        return fetch(`sounds/${name}.bin`)
             .then(r => { 
                 if (!r.ok) throw new Error(`HTTP ${r.status}`); 
                 return r.arrayBuffer(); 
@@ -171,7 +171,7 @@ function load(name) {
         resumeBg,
         stopBg,
         
-        playCustom(name, rate = 1.0) {
+	playCustom(name, rate = 1.0) {
             play(name, { volume: 1.0, rate: rate });
         },
 
@@ -192,7 +192,7 @@ function load(name) {
 
         newTray()    { play('new_tray',  {volume:0.7}); },
         chestOpen()  { play('chest_open',{volume:1.0}); vibe([20,10,40]); },
-        chestUpg()   { play('chest_upgrade',{volume:0.9}); vibe(30); },
+        chestUpg()   { play('chest_upgrade',{volume:0.7}); vibe(30); },
         areaBlock()  { play('area_destroy',{volume:0.95}); vibe([15,5,15]); },
         hammerCrack(){ play('hammer_crack',{volume:1.0}); vibe([40,10,20,10,20]); },
         minusLaugh() { play('minus_laugh',{volume:0.85}); vibe([10,10,10,10,10]); },
